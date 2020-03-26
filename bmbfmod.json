@@ -1,0 +1,23 @@
+{
+    "id": "tricksaber",
+    "name": "TrickSaber",
+    "author": "Rugtveit",
+    "description": [
+        
+    ],
+    "category": "Gameplay",
+    "gameVersion": "1.7.0",
+    "version": "0.1.0",
+    "platform": "Quest",
+    "components": [
+        {
+            "type": "HookMod",
+            "installAction": {
+                "installLibraryFile": "libtricksaber.so"
+            },
+            "uninstallAction": {
+                "removeLibraryFile": "libtricksaber.so"
+            }
+        }
+    ]
+}
