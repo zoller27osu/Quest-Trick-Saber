@@ -2,3 +2,11 @@
 .vscode/
 
 build.bat
+
+libs/
+
+obj/
+
+Quest Trick Saber.zip
+
+libtricksaber.so
