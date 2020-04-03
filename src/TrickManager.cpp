@@ -36,6 +36,7 @@ enum XRNode
 
 
 
+
 Space spaceVar = Self;
 
 Vector3 Vector3Zero = {0.0f, 0.0f, 0.0f};
@@ -107,8 +108,9 @@ void TrickManager::Start()
 {
     OVRInput = il2cpp_utils::GetClassFromName("", "OVRInput");
     _rigidBody = GetComponent(Saber, il2cpp_utils::GetClassFromName("UnityEngine", "Rigidbody"));
-    _collider = GetComponent(Saber, il2cpp_utils::GetClassFromName("UnityEngine", "BoxCollider"));
+    _collider  = GetComponent(Saber, il2cpp_utils::GetClassFromName("UnityEngine", "BoxCollider"));
     _vrPlatformHelper = il2cpp_utils::GetFieldValue(Controller, "_vrPlatformHelper");
+
     if (_isLeftSaber)
     {
         _buttonMapping = _buttonMapping.LeftButtons;
@@ -121,6 +123,7 @@ void TrickManager::Start()
 
 void TrickManager::Update()
 {
+    
 
     ValueTuple trackingPos = GetTrackingPos();
     _controllerPosition = trackingPos.item1;
@@ -158,10 +161,7 @@ ValueTuple TrickManager::GetTrackingPos()
 {
     ValueTuple result;
     ValueTuple result2;
-    Il2CppObject *OVRPose;
     bool NodePose;
-    Vector3*      RefVector;
-    Quaternion*   RefQuaternion;
 
     XRNode controllerNode;
     int controllerNodeIdx;
@@ -169,7 +169,7 @@ ValueTuple TrickManager::GetTrackingPos()
     il2cpp_utils::RunMethod(&controllerNode, Controller, "get_node");
     il2cpp_utils::RunMethod(&controllerNodeIdx, Controller, "get_nodeIdx");
 
-    il2cpp_utils::RunMethodUnsafe(&NodePose, _vrPlatformHelper, "GetNodePose", controllerNode, controllerNodeIdx, &RefVector, &RefQuaternion); // IF IT DOESN*T WORK REPLACE THIS WITH INVOKE!
+    il2cpp_utils::RunMethodUnsafe(&NodePose, _vrPlatformHelper, "GetNodePose", controllerNode, controllerNodeIdx, &result.item1, &result.item2); // IF IT DOESN*T WORK REPLACE THIS WITH INVOKE!
     if(!NodePose)
     {
         log(DEBUG, "Think!?");
@@ -192,33 +192,31 @@ void TrickManager::CheckButtons()
     {
         OVRInput = il2cpp_utils::GetClassFromName("", "OVRInput");
     }
+
     il2cpp_utils::RunMethodUnsafe(&ThrowButtonPressed, OVRInput, "Get", &_buttonMapping.ThrowButton, minInt);
     if (ThrowButtonPressed && !_getBack)
     {
         ThrowStart();
-    }
-    else
-    {
+    } else { 
         il2cpp_utils::RunMethodUnsafe(&ThrowButtonNotPressed, OVRInput, "GetUp", &_buttonMapping.ThrowButton, minInt);
 
-        if (ThrowButtonNotPressed && !_getBack)
-        {
-            ThrowReturn();
-        }
-        else
-        {
-            il2cpp_utils::RunMethodUnsafe(&RotateButtonPressed, OVRInput, "Get", &_buttonMapping.RotateButton, minInt);
-            if (RotateButtonPressed && !_isThrowing && !_getBack)
+            if (ThrowButtonNotPressed && !_getBack)
             {
-                InPlaceRotation();
-            }
-            else
-            {
-                il2cpp_utils::RunMethodUnsafe(&RotateButtonNotPressed, OVRInput, "GetUp", &_buttonMapping.RotateButton, minInt);
-                if (RotateButtonNotPressed && _isRotatingInPlace)
+                ThrowReturn();
+            } else {
+                il2cpp_utils::RunMethodUnsafe(&RotateButtonPressed, OVRInput, "Get", &_buttonMapping.RotateButton, minInt);
+                
+                if (RotateButtonPressed && !_isThrowing && !_getBack)
                 {
-                    InPlaceRotationEnd();
-                }
+                    InPlaceRotation();
+                } else  {
+                    
+                    il2cpp_utils::RunMethodUnsafe(&RotateButtonNotPressed, OVRInput, "GetUp", &_buttonMapping.RotateButton, minInt);
+                    
+                    if (RotateButtonNotPressed && _isRotatingInPlace)
+                    {
+                        InPlaceRotationEnd();
+                    }
             }
         }
     }
@@ -228,16 +226,15 @@ void TrickManager::ThrowStart()
 {
     if (!_isThrowing)
     {
-
         il2cpp_utils::RunMethod(Controller, "set_enabled", false);
         il2cpp_utils::RunMethod(_rigidBody, "set_isKinematic", false);
         Vector3 velo = Vector3_Multiply(_velocity, 220.0F);
         il2cpp_utils::RunMethod(_rigidBody, "set_velocity", velo);
         il2cpp_utils::RunMethod(_collider, "set_enabled", false);
-        il2cpp_utils::RunMethod(_rigidBody, "set_isKinematic", false);
         _saberRotSpeed = _saberSpeed * 400.0f;
         _isThrowing = true;
     }
+
     ThrowUpdate();
 }
 
@@ -245,11 +242,10 @@ void TrickManager::ThrowUpdate()
 {
     Il2CppObject *saberGO;
     Il2CppObject *saberTransform;
-    Vector3 saberPos;
+
     // saberPos = this.Saber.transform.position;
     il2cpp_utils::RunMethod(&saberGO, Saber, "get_gameObject");
     il2cpp_utils::RunMethod(&saberTransform, saberGO, "get_transform");
-    il2cpp_utils::RunMethod(&saberPos, saberTransform, "get_position");
     il2cpp_utils::RunMethodUnsafe(saberTransform, "Rotate", Vector3_Right, _saberRotSpeed, &spaceVar);
 }
 
@@ -294,6 +290,7 @@ void TrickManager::InPlaceRotation()
     {
         InPlaceRotationStart();
     }
+
     il2cpp_utils::RunMethod(&saberGO, Saber, "get_gameObject");
     il2cpp_utils::RunMethod(&saberTransform, saberGO, "get_transform");
     il2cpp_utils::RunMethod(saberTransform, "set_rotation", _controllerRotation);

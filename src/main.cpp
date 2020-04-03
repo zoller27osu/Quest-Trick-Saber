@@ -3,7 +3,7 @@
 TrickManager leftSaber;
 TrickManager rightSaber;
 MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self){
-    Saber_Start(self);
+    
     int saberType;
     il2cpp_utils::RunMethod(&saberType, self, "get_saberType");
     log(DEBUG, "SaberType: %i", saberType);
@@ -18,11 +18,13 @@ MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self){
         rightSaber.Saber = self;
         rightSaber.Start();
     }
+    Saber_Start(self);
     
 }
 
 
 MAKE_HOOK_OFFSETLESS(Saber_ManualUpdate, void, Il2CppObject* self){
+    Saber_ManualUpdate(self);
     leftSaber.Update();
     //rightSaber.LogEverything();
     rightSaber.Update();
