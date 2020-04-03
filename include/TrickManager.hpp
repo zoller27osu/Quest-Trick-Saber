@@ -123,13 +123,13 @@ class TrickManager {
         bool          _isThrowing = false;
         bool          _isRotatingInPlace = false;
         bool          _getBack = false;
-        Il2CppObject* _rigidBody;        // Rigidbody
-        Il2CppObject* _collider;         // BoxCollider
+        Il2CppObject* _rigidBody = nullptr;        // Rigidbody
+        Il2CppObject* _collider = nullptr;    // BoxCollider
         Vector3       _controllerPosition = Vector3_zero; 
         Quaternion    _controllerRotation = {0.0f, 0.0f, 0.0f, 1.0f}; // same as Quaternion.identity
         Vector3       _velocity           = Vector3_zero; 
         Vector3       _prevPos            = Vector3_zero;
-        float         _currentRotation;
+        float         _currentRotation;   
         float         _saberSpeed         = 0.0f;
         float         _saberRotSpeed      = 0.0f;
 
