@@ -1,40 +1,46 @@
 #include "../include/main.hpp"
 #include "../include/TrickManager.hpp"
+
 TrickManager leftSaber;
 TrickManager rightSaber;
-MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self){
-    
+
+MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self) {
+    Saber_Start(self);
     int saberType;
-    il2cpp_utils::RunMethod(&saberType, self, "get_saberType");
+    CRASH_UNLESS(il2cpp_utils::GetPropertyValue(&saberType, self, "saberType"));
     log(DEBUG, "SaberType: %i", saberType);
     if(saberType == 0){
         log(DEBUG, "Left?");
-        leftSaber.Controller = il2cpp_utils::GetFieldValue(self, "_vrController");
+        leftSaber.VRController = CRASH_UNLESS(il2cpp_utils::GetFieldValue(self, "_vrController"));
         leftSaber.Saber = self;
         leftSaber._isLeftSaber = true;
         leftSaber.Start();
     } else {
-        rightSaber.Controller = il2cpp_utils::GetFieldValue(self, "_vrController");
+        log(DEBUG, "Right?");
+        rightSaber.VRController = CRASH_UNLESS(il2cpp_utils::GetFieldValue(self, "_vrController"));
         rightSaber.Saber = self;
         rightSaber.Start();
     }
-    Saber_Start(self);
-    
 }
 
-
-MAKE_HOOK_OFFSETLESS(Saber_ManualUpdate, void, Il2CppObject* self){
+MAKE_HOOK_OFFSETLESS(Saber_ManualUpdate, void, Il2CppObject* self) {
     Saber_ManualUpdate(self);
-    leftSaber.Update();
-    //rightSaber.LogEverything();
-    rightSaber.Update();
+    if (self == leftSaber.Saber) {
+        leftSaber.Update();
+    } else if (self == rightSaber.Saber) {
+        // rightSaber.LogEverything();
+        rightSaber.Update();
+    }
 }
 
+MAKE_HOOK_OFFSETLESS(OVRInput_Update, void, Il2CppObject* self) {
+    log(DEBUG, "OVRInput_Update!");
+    OVRInput_Update(self);
+}
 
 extern "C" void load() {
-    log(INFO, "Hello from il2cpp_init!");
     log(INFO, "Installing hooks...");
-    INSTALL_HOOK_OFFSETLESS(Saber_ManualUpdate, il2cpp_utils::FindMethodUnsafe("", "Saber", "ManualUpdate", 0));
-    INSTALL_HOOK_OFFSETLESS(Saber_Start, il2cpp_utils::FindMethodUnsafe("", "Saber", "Start", 0));
+    INSTALL_HOOK_OFFSETLESS(Saber_ManualUpdate, il2cpp_utils::FindMethod("", "Saber", "ManualUpdate"));
+    INSTALL_HOOK_OFFSETLESS(Saber_Start, il2cpp_utils::FindMethod("", "Saber", "Start"));
     log(INFO, "Installed all hooks!");
 }

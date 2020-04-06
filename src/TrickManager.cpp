@@ -1,236 +1,169 @@
 #include "../include/TrickManager.hpp"
 // Define static fields
+// According to Oculus documentation, left is always Primary and Right is always secondary UNLESS referred to individually.
+// https://developer.oculus.com/reference/unity/v14/class_o_v_r_input
 ButtonMapping ButtonMapping::LeftButtons = ButtonMapping(PrimaryIndexTrigger, PrimaryThumbstickLeft);
 ButtonMapping ButtonMapping::RightButtons = ButtonMapping(SecondaryIndexTrigger, SecondaryThumbstickRight);
+Space RotateSpace = Self;
 
 Il2CppClass *OVRInput = nullptr;
-int minInt = -2147483648;
-enum Space
-{
-    World,
-    Self
-};
-
-enum XRNode
-{
-    // Token: 0x0400000B RID: 11
-    LeftEye,
-    // Token: 0x0400000C RID: 12
-    RightEye,
-    // Token: 0x0400000D RID: 13
-    CenterEye,
-    // Token: 0x0400000E RID: 14
-    Head,
-    // Token: 0x0400000F RID: 15
-    LeftHand,
-    // Token: 0x04000010 RID: 16
-    RightHand,
-    // Token: 0x04000011 RID: 17
-    GameController,
-    // Token: 0x04000012 RID: 18
-    TrackingReference,
-    // Token: 0x04000013 RID: 19
-    HardwareTracker
-};
+Controller ControllerMask;
 
 
-
-
-
-Space spaceVar = Self;
-
-Vector3 Vector3Zero = {0.0f, 0.0f, 0.0f};
-
-void TrickManager::LogEverything()
-{
+void TrickManager::LogEverything() {
     log(DEBUG, "_isThrowing %i", _isThrowing);
     log(DEBUG, "_isRotatingInPlace %i", _isRotatingInPlace);
     log(DEBUG, "RotationSpeed: %f", _saberSpeed);
 }
 
-float getDeltaTime()
-{
+float getDeltaTime() {
     float result;
-    if (!il2cpp_utils::RunMethod(&result, il2cpp_utils::GetClassFromName("UnityEngine", "Time"), "get_deltaTime"))
-    {
-        log(DEBUG, "Failed to get deltaTime");
-    }
+    RET_0_UNLESS(il2cpp_utils::RunMethod(&result, "UnityEngine", "Time", "get_deltaTime"));
     return result;
 }
 
+
+Vector3 Vector3_Zero = {0.0f, 0.0f, 0.0f};
 Vector3 Vector3_Right = {1.0f, 0.0f, 0.0f};
 
-Vector3 Vector3_Multiply(Vector3 &value1, float value2)
-{
+Vector3 Vector3_Multiply(Vector3 &vec, float scalar) {
     Vector3 result;
-    result.x = value1.x * value2;
-    result.y = value1.y * value2;
-    result.z = value1.z * value2;
+    result.x = vec.x * scalar;
+    result.y = vec.y * scalar;
+    result.z = vec.z * scalar;
     return result;
 }
 
-float Vector3_Distance(Vector3 &value1, Vector3 &value2)
-{
-    float num = value1.x - value2.x;
-    float num2 = value1.y - value2.y;
-    float num3 = value1.z - value2.z;
-    return sqrt(num * num + num2 * num2 + num3 * num3);
+float Vector3_Distance(Vector3 &a, Vector3 &b) {
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    float dz = a.z - b.z;
+    return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-Vector3 Vector3_Subtract(Vector3 &value1, Vector3 &value2)
-{
+Vector3 Vector3_Subtract(Vector3 &a, Vector3 &b) {
     Vector3 result;
-    result.x = value1.x - value2.x;
-    result.y = value1.y - value2.y;
-    result.z = value1.z - value2.z;
+    result.x = a.x - b.x;
+    result.y = a.y - b.y;
+    result.z = a.z - b.z;
     return result;
 }
 
-Il2CppObject *GetComponent(Il2CppObject *object, Il2CppClass *type)
-{
-    Il2CppObject *componentGO;
+Il2CppObject *GetComponent(Il2CppObject *object, Il2CppClass *type) {
     Il2CppObject *component;
-    if (!il2cpp_utils::RunMethod(&componentGO, object, "get_gameObject"))
-    {
-        log(ERROR, "Failed to GetComponent!");
-        return nullptr;
-    }
-    if (!il2cpp_utils::RunMethod(&component, componentGO, "GetComponent", il2cpp_utils::GetSystemType(type)))
-    {
-        log(ERROR, "Failed to GetComponent!");
-        return nullptr;
-    }
-
+    // Blame Sc2ad if this simplification doesn't work
+    RET_0_UNLESS(il2cpp_utils::RunMethod(&component, object, "GetComponent", il2cpp_utils::GetSystemType(type)));
     return component;
 }
 
-void TrickManager::Start()
-{
+
+void TrickManager::Start() {
     OVRInput = il2cpp_utils::GetClassFromName("", "OVRInput");
+    CRASH_UNLESS(il2cpp_utils::GetFieldValue(&ControllerMask, il2cpp_utils::GetClassFromName("", "OVRInput/Controller"), "All"));
+
     _rigidBody = GetComponent(Saber, il2cpp_utils::GetClassFromName("UnityEngine", "Rigidbody"));
     _collider  = GetComponent(Saber, il2cpp_utils::GetClassFromName("UnityEngine", "BoxCollider"));
-    _vrPlatformHelper = il2cpp_utils::GetFieldValue(Controller, "_vrPlatformHelper");
+    _vrPlatformHelper = CRASH_UNLESS(il2cpp_utils::GetFieldValue(VRController, "_vrPlatformHelper"));
 
-    if (_isLeftSaber)
-    {
-        _buttonMapping = _buttonMapping.LeftButtons;
-    }
-    else
-    {
-        _buttonMapping = _buttonMapping.RightButtons;
+    if (_isLeftSaber) {
+        _buttonMapping = ButtonMapping::LeftButtons;
+    } else {
+        _buttonMapping = ButtonMapping::RightButtons;
     }
 }
 
-void TrickManager::Update()
-{
-    
-
+void TrickManager::Update() {
+    if (!_vrPlatformHelper) return;
     ValueTuple trackingPos = GetTrackingPos();
     _controllerPosition = trackingPos.item1;
     _controllerRotation = trackingPos.item2;
     _velocity = Vector3_Subtract(_controllerPosition, _prevPos);
     _saberSpeed = Vector3_Distance(_controllerPosition, _prevPos);
     _prevPos = _controllerPosition;
-    if (_getBack)
-    {
+    if (_getBack) {
         float deltaTime = getDeltaTime();
         float num = 8.0f * deltaTime;
         Il2CppObject *saberGO;
         Il2CppObject *saberTransform;
         Vector3 saberPos;
         // saberPos = this.Saber.transform.position;
-        il2cpp_utils::RunMethod(&saberGO, Saber, "get_gameObject");
-        il2cpp_utils::RunMethod(&saberTransform, saberGO, "get_transform");
-        il2cpp_utils::RunMethod(&saberPos, saberTransform, "get_position");
-        il2cpp_utils::RunMethod(&saberPos, il2cpp_utils::GetClassFromName("UnityEngine", "Vector3"), "Lerp", saberPos, _controllerPosition, num);
-        il2cpp_utils::RunMethod(saberTransform, "set_position", saberPos);
+        CRASH_UNLESS(il2cpp_utils::RunMethod(&saberGO, Saber, "get_gameObject"));
+        CRASH_UNLESS(il2cpp_utils::RunMethod(&saberTransform, saberGO, "get_transform"));
+        CRASH_UNLESS(il2cpp_utils::RunMethod(&saberPos, saberTransform, "get_position"));
+        CRASH_UNLESS(il2cpp_utils::RunMethod(&saberPos, "UnityEngine", "Vector3", "Lerp", saberPos, _controllerPosition, num));
+        CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "set_position", saberPos));
         float num2 = Vector3_Distance(_controllerPosition, saberPos);
-        if (num2 < 0.3f)
-        {
+        if (num2 < 0.3f) {
             ThrowEnd();
-        }
-        else
-        {
-            il2cpp_utils::RunMethodUnsafe(saberTransform, "Rotate", Vector3_Right, _saberRotSpeed, &spaceVar);
+        } else {
+            CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "Rotate", Vector3_Right, _saberRotSpeed, RotateSpace));
         }
     }
     CheckButtons();
 }
 
-ValueTuple TrickManager::GetTrackingPos()
-{
+ValueTuple TrickManager::GetTrackingPos() {
     ValueTuple result;
-    ValueTuple result2;
-    bool NodePose;
+    bool nodePose;
 
     XRNode controllerNode;
     int controllerNodeIdx;
 
-    il2cpp_utils::RunMethod(&controllerNode, Controller, "get_node");
-    il2cpp_utils::RunMethod(&controllerNodeIdx, Controller, "get_nodeIdx");
+    CRASH_UNLESS(il2cpp_utils::RunMethod(&controllerNode, VRController, "get_node"));
+    CRASH_UNLESS(il2cpp_utils::RunMethod(&controllerNodeIdx, VRController, "get_nodeIdx"));
 
-    il2cpp_utils::RunMethodUnsafe(&NodePose, _vrPlatformHelper, "GetNodePose", controllerNode, controllerNodeIdx, &result.item1, &result.item2); // IF IT DOESN*T WORK REPLACE THIS WITH INVOKE!
-    if(!NodePose)
-    {
-        log(DEBUG, "Think!?");
-        result2.item1 = {-0.2f, 0.05f, 0.0f};
-        result2.item2 = {0.0f, 0.0f, 0.0f, 1.0f};
-        return result2;
+    CRASH_UNLESS(il2cpp_utils::RunMethod(&nodePose, _vrPlatformHelper, "GetNodePose", controllerNode, controllerNodeIdx,
+        result.item1, result.item2));
+    if (!nodePose) {
+        result.item1 = {-0.2f, 0.05f, 0.0f};
+        result.item2 = {0.0f, 0.0f, 0.0f, 1.0f};
     }
-
     return result;
 }
 
-void TrickManager::CheckButtons()
-{
+void TrickManager::CheckButtons() {
     bool ThrowButtonPressed;
     bool ThrowButtonNotPressed;
     bool RotateButtonPressed;
     bool RotateButtonNotPressed;
 
-    if (OVRInput == nullptr)
-    {
+    if (!OVRInput) {
         OVRInput = il2cpp_utils::GetClassFromName("", "OVRInput");
     }
 
-    il2cpp_utils::RunMethodUnsafe(&ThrowButtonPressed, OVRInput, "Get", &_buttonMapping.ThrowButton, minInt);
-    if (ThrowButtonPressed && !_getBack)
-    {
+    il2cpp_utils::RunMethod(&ThrowButtonPressed, OVRInput, "Get", _buttonMapping.ThrowButton, ControllerMask);
+    if (ThrowButtonPressed && !_getBack) {
         ThrowStart();
-    } else { 
-        il2cpp_utils::RunMethodUnsafe(&ThrowButtonNotPressed, OVRInput, "GetUp", &_buttonMapping.ThrowButton, minInt);
+    } else {
 
-            if (ThrowButtonNotPressed && !_getBack)
-            {
-                ThrowReturn();
+        il2cpp_utils::RunMethod(&ThrowButtonNotPressed, OVRInput, "GetUp", _buttonMapping.ThrowButton, ControllerMask);
+        if (ThrowButtonNotPressed && !_getBack) {
+            ThrowReturn();
+        } else {
+
+            il2cpp_utils::RunMethod(&RotateButtonPressed, OVRInput, "Get", _buttonMapping.RotateButton, ControllerMask);
+            if (RotateButtonPressed && !_isThrowing && !_getBack) {
+                InPlaceRotation();
             } else {
-                il2cpp_utils::RunMethodUnsafe(&RotateButtonPressed, OVRInput, "Get", &_buttonMapping.RotateButton, minInt);
-                
-                if (RotateButtonPressed && !_isThrowing && !_getBack)
-                {
-                    InPlaceRotation();
-                } else  {
-                    
-                    il2cpp_utils::RunMethodUnsafe(&RotateButtonNotPressed, OVRInput, "GetUp", &_buttonMapping.RotateButton, minInt);
-                    
-                    if (RotateButtonNotPressed && _isRotatingInPlace)
-                    {
-                        InPlaceRotationEnd();
-                    }
+
+                il2cpp_utils::RunMethod(&RotateButtonNotPressed, OVRInput, "GetUp", _buttonMapping.RotateButton, ControllerMask);
+                if (RotateButtonNotPressed && _isRotatingInPlace) {
+                    InPlaceRotationEnd();
+                }
             }
         }
     }
 }
 
-void TrickManager::ThrowStart()
-{
-    if (!_isThrowing)
-    {
-        il2cpp_utils::RunMethod(Controller, "set_enabled", false);
-        il2cpp_utils::RunMethod(_rigidBody, "set_isKinematic", false);
+
+void TrickManager::ThrowStart() {
+    log(DEBUG, "%s throw start!", _isLeftSaber ? "Left" : "Right");
+    if (!_isThrowing) {
+        CRASH_UNLESS(il2cpp_utils::RunMethod(VRController, "set_enabled", false));
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_rigidBody, "set_isKinematic", false));
         Vector3 velo = Vector3_Multiply(_velocity, 220.0F);
-        il2cpp_utils::RunMethod(_rigidBody, "set_velocity", velo);
-        il2cpp_utils::RunMethod(_collider, "set_enabled", false);
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_rigidBody, "set_velocity", velo));
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_collider, "set_enabled", false));
         _saberRotSpeed = _saberSpeed * 400.0f;
         _isThrowing = true;
     }
@@ -238,63 +171,56 @@ void TrickManager::ThrowStart()
     ThrowUpdate();
 }
 
-void TrickManager::ThrowUpdate()
-{
+void TrickManager::ThrowUpdate() {
     Il2CppObject *saberGO;
     Il2CppObject *saberTransform;
 
     // saberPos = this.Saber.transform.position;
-    il2cpp_utils::RunMethod(&saberGO, Saber, "get_gameObject");
-    il2cpp_utils::RunMethod(&saberTransform, saberGO, "get_transform");
-    il2cpp_utils::RunMethodUnsafe(saberTransform, "Rotate", Vector3_Right, _saberRotSpeed, &spaceVar);
+    CRASH_UNLESS(il2cpp_utils::RunMethod(&saberGO, Saber, "get_gameObject"));
+    CRASH_UNLESS(il2cpp_utils::RunMethod(&saberTransform, saberGO, "get_transform"));
+    CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "Rotate", Vector3_Right, _saberRotSpeed, RotateSpace));
 }
 
-void TrickManager::ThrowReturn()
-{
-    if (_isThrowing)
-    {
-
-        il2cpp_utils::RunMethod(_rigidBody, "set_isKinematic", true);
-        il2cpp_utils::RunMethod(_rigidBody, "set_velocity", Vector3Zero);
+void TrickManager::ThrowReturn() {
+    if (_isThrowing) {
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_rigidBody, "set_isKinematic", true));
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_rigidBody, "set_velocity", Vector3_Zero));
         _getBack = true;
         _isThrowing = false;
     }
 }
 
-void TrickManager::ThrowEnd()
-{
+void TrickManager::ThrowEnd() {
     _getBack = false;
-    il2cpp_utils::RunMethod(_collider, "set_enabled", true);
-    il2cpp_utils::RunMethod(Controller, "set_enabled", true);
+    CRASH_UNLESS(il2cpp_utils::RunMethod(_collider, "set_enabled", true));
+    CRASH_UNLESS(il2cpp_utils::RunMethod(VRController, "set_enabled", true));
 }
 
-void TrickManager::InPlaceRotationStart()
-{
+
+void TrickManager::InPlaceRotationStart() {
+    log(DEBUG, "%s rotate start!", _isLeftSaber ? "Left" : "Right");
     _currentRotation = 0.0f;
-    il2cpp_utils::RunMethod(Controller, "set_enabled", false);
+    CRASH_UNLESS(il2cpp_utils::RunMethod(VRController, "set_enabled", false));
     _isRotatingInPlace = true;
 }
 
-void TrickManager::InPlaceRotationEnd()
-{
+void TrickManager::InPlaceRotationEnd() {
     _isRotatingInPlace = false;
-    il2cpp_utils::RunMethod(Controller, "set_enabled", true);
+    CRASH_UNLESS(il2cpp_utils::RunMethod(VRController, "set_enabled", true));
 }
 
-void TrickManager::InPlaceRotation()
-{
+void TrickManager::InPlaceRotation() {
     Il2CppObject *saberGO;
     Il2CppObject *saberTransform;
 
-    if (!_isRotatingInPlace)
-    {
+    if (!_isRotatingInPlace) {
         InPlaceRotationStart();
     }
 
-    il2cpp_utils::RunMethod(&saberGO, Saber, "get_gameObject");
-    il2cpp_utils::RunMethod(&saberTransform, saberGO, "get_transform");
-    il2cpp_utils::RunMethod(saberTransform, "set_rotation", _controllerRotation);
-    il2cpp_utils::RunMethod(saberTransform, "set_position", _controllerPosition);
+    CRASH_UNLESS(il2cpp_utils::RunMethod(&saberGO, Saber, "get_gameObject"));
+    CRASH_UNLESS(il2cpp_utils::RunMethod(&saberTransform, saberGO, "get_transform"));
+    CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "set_rotation", _controllerRotation));
+    CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "set_position", _controllerPosition));
     _currentRotation -= 18.0F;
-    il2cpp_utils::RunMethodUnsafe(saberTransform, "Rotate", Vector3_Right, _currentRotation, &spaceVar);
+    CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "Rotate", Vector3_Right, _currentRotation, RotateSpace));
 }
