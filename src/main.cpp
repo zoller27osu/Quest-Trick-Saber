@@ -6,18 +6,17 @@ TrickManager rightSaber;
 
 MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self) {
     Saber_Start(self);
-    int saberType;
-    CRASH_UNLESS(il2cpp_utils::GetPropertyValue(&saberType, self, "saberType"));
+    int saberType = *CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(self, "saberType"));
     log(DEBUG, "SaberType: %i", saberType);
     if(saberType == 0){
         log(DEBUG, "Left?");
-        leftSaber.VRController = CRASH_UNLESS(il2cpp_utils::GetFieldValue(self, "_vrController"));
+        leftSaber.VRController = *CRASH_UNLESS(il2cpp_utils::GetFieldValue(self, "_vrController"));
         leftSaber.Saber = self;
         leftSaber._isLeftSaber = true;
         leftSaber.Start();
     } else {
         log(DEBUG, "Right?");
-        rightSaber.VRController = CRASH_UNLESS(il2cpp_utils::GetFieldValue(self, "_vrController"));
+        rightSaber.VRController = *CRASH_UNLESS(il2cpp_utils::GetFieldValue(self, "_vrController"));
         rightSaber.Saber = self;
         rightSaber.Start();
     }
