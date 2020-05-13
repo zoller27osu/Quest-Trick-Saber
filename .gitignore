@@ -10,3 +10,7 @@ obj/
 Quest Trick Saber.zip
 
 libtricksaber.so
+
+*.7z
+
+*.log
