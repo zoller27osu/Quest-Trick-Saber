@@ -1,45 +1,129 @@
 #include "../include/TrickManager.hpp"
-// Define static fields
-// According to Oculus documentation, left is always Primary and Right is always secondary UNLESS referred to individually.
-// https://developer.oculus.com/reference/unity/v14/class_o_v_r_input
-ButtonMapping ButtonMapping::LeftButtons = ButtonMapping(PrimaryIndexTrigger, PrimaryThumbstickLeft);
-ButtonMapping ButtonMapping::RightButtons = ButtonMapping(SecondaryIndexTrigger, SecondaryThumbstickRight);
-Space RotateSpace = Self;
+#include <algorithm>
+#include <optional>
+#include <queue>
+#include "../include/PluginConfig.hpp"
+#include "../include/AllInputHandlers.hpp"
+#include "../extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
+#include "../extern/beatsaber-hook/shared/utils/instruction-parsing.hpp"
 
-Il2CppClass *OVRInput = nullptr;
-Controller ControllerMask;
+// Define static fields
+constexpr Space RotateSpace = Space::Self;
+
+
+// for "ApplySlowmoSmooth" / "EndSlowmoSmooth"
+static TrickState _slowmoState = Inactive;  // must also be reset in Start()
+static float _slowmoTimeScale;
+static float _originalTimeScale;
+static float _targetTimeScale;
+static Il2CppObject* _audioSource;
+
+
+static const MethodInfo* VRController_get_transform = nullptr;
+static std::unordered_map<Il2CppObject*, Il2CppObject*> fakeTransforms;
+static bool VRController_transform_is_hooked = false;
+MAKE_HOOK_OFFSETLESS(VRController_get_transform_hook, Il2CppObject*, Il2CppObject* self) {
+    auto pair = fakeTransforms.find(self);
+    if ( pair == fakeTransforms.end() ) {
+        return VRController_get_transform_hook(self);
+    } else {
+        return pair->second;
+    }
+}
+
+static Il2CppObject* AudioTimeSyncController;
+static Il2CppObject* SaberClashChecker;
+
+void ButtonMapping::Update() {
+    // According to Oculus documentation, left is always Primary and Right is always secondary UNLESS referred to individually.
+    // https://developer.oculus.com/reference/unity/v14/class_o_v_r_input
+    Controller oculusController;
+    XRNode node;
+    if (left) {
+        oculusController = Controller::LTouch;
+        node = XRNode::LeftHand;
+    } else {
+        oculusController = Controller::RTouch;
+        node = XRNode::RightHand;
+    }
+
+    // Method missing from libil2cpp.so
+    //auto* controllerInputDevice = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine.XR", "InputDevices", "GetDeviceAtXRNode", node));
+    static auto* getDeviceIdAtXRNode = CRASH_UNLESS(il2cpp_functions::resolve_icall("UnityEngine.XR.InputTracking::GetDeviceIdAtXRNode"));
+    log(DEBUG, "getDeviceIdAtXRNode ptr offset: %lX", asOffset(getDeviceIdAtXRNode));
+    auto deviceId = ((function_ptr_t<uint64_t, XRNode>)(getDeviceIdAtXRNode))(node);
+    auto* controllerInputDevice = CRASH_UNLESS(il2cpp_utils::New("UnityEngine.XR", "InputDevice", deviceId));
+
+    log(DEBUG, "oculusController: %i", (int)oculusController);
+    bool isOculus = CRASH_UNLESS(il2cpp_utils::RunMethod<bool>("", "OVRInput", "IsControllerConnected", oculusController));
+    log(DEBUG, "isOculus: %i", isOculus);
+    auto vrSystem = isOculus ? VRSystem::Oculus : VRSystem::SteamVR;
+
+    auto dir = PluginConfig::Instance().ThumbstickDirection;
+
+    InputHandler* triggerHandler = new TriggerHandler(node, PluginConfig::Instance().TriggerThreshold);
+    InputHandler* gripHandler = new GripHandler(vrSystem, oculusController, controllerInputDevice,
+        PluginConfig::Instance().GripThreshold);
+    InputHandler* thumbstickHandler = new ThumbstickHandler(node, PluginConfig::Instance().ThumbstickThreshold, dir);
+
+    actionHandlers.clear();
+    actionHandlers[PluginConfig::Instance().TriggerAction].insert(triggerHandler);
+    actionHandlers[PluginConfig::Instance().GripAction].insert(gripHandler);
+    actionHandlers[PluginConfig::Instance().ThumbstickAction].insert(thumbstickHandler);
+    if (actionHandlers[TrickAction::Throw].empty()) {
+        log(WARNING, "No inputs assigned to Throw! Throw will never trigger!");
+    }
+    if (actionHandlers[TrickAction::Spin].empty()) {
+        log(WARNING, "No inputs assigned to Spin! Spin will never trigger!");
+    }
+}
 
 
 void TrickManager::LogEverything() {
-    log(DEBUG, "_isThrowing %i", _isThrowing);
-    log(DEBUG, "_isRotatingInPlace %i", _isRotatingInPlace);
+    log(DEBUG, "_throwState %i", _throwState);
+    log(DEBUG, "_spinState %i", _spinState);
     log(DEBUG, "RotationSpeed: %f", _saberSpeed);
 }
 
 float getDeltaTime() {
-    return *RET_0_UNLESS(il2cpp_utils::RunMethod<float>("UnityEngine", "Time", "get_deltaTime"));
+    return RET_0_UNLESS(il2cpp_utils::RunMethod<float>("UnityEngine", "Time", "get_deltaTime"));
 }
 
 
-Vector3 Vector3_Zero = {0.0f, 0.0f, 0.0f};
-Vector3 Vector3_Right = {1.0f, 0.0f, 0.0f};
-
-Vector3 Vector3_Multiply(Vector3 &vec, float scalar) {
+Vector3 Vector3_Multiply(const Vector3 &vec, float scalar) {
     Vector3 result;
     result.x = vec.x * scalar;
     result.y = vec.y * scalar;
     result.z = vec.z * scalar;
     return result;
 }
+Vector3 Vector3_Divide(const Vector3 &vec, float scalar) {
+    Vector3 result;
+    result.x = vec.x / scalar;
+    result.y = vec.y / scalar;
+    result.z = vec.z / scalar;
+    return result;
+}
 
-float Vector3_Distance(Vector3 &a, Vector3 &b) {
+float Vector3_Distance(const Vector3 &a, const Vector3 &b) {
     float dx = a.x - b.x;
     float dy = a.y - b.y;
     float dz = a.z - b.z;
     return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-Vector3 Vector3_Subtract(Vector3 &a, Vector3 &b) {
+float Vector3_Magnitude(const Vector3 &v) {
+    return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+Vector3 Vector3_Add(const Vector3 &a, const Vector3 &b) {
+    Vector3 result;
+    result.x = a.x + b.x;
+    result.y = a.y + b.y;
+    result.z = a.z + b.z;
+    return result;
+}
+Vector3 Vector3_Subtract(const Vector3 &a, const Vector3 &b) {
     Vector3 result;
     result.x = a.x - b.x;
     result.y = a.y - b.y;
@@ -47,151 +131,613 @@ Vector3 Vector3_Subtract(Vector3 &a, Vector3 &b) {
     return result;
 }
 
-Il2CppObject *GetComponent(Il2CppObject *object, Il2CppClass *type) {
-    auto sysType = RET_0_UNLESS(il2cpp_utils::GetSystemType(type));
-    // Blame Sc2ad if this simplification doesn't work
-    return *RET_0_UNLESS(il2cpp_utils::RunMethod(object, "GetComponent", sysType));
+static Il2CppClass* cQuaternion;
+Quaternion Quaternion_Multiply(const Quaternion &lhs, const Quaternion &rhs) {
+    return Quaternion{
+        lhs.w * rhs.x + lhs.x * rhs.w + lhs.y * rhs.z - lhs.z * rhs.y,
+        lhs.w * rhs.y + lhs.y * rhs.w + lhs.z * rhs.x - lhs.x * rhs.z,
+        lhs.w * rhs.z + lhs.z * rhs.w + lhs.x * rhs.y - lhs.y * rhs.x,
+        lhs.w * rhs.w - lhs.x * rhs.x - lhs.y * rhs.y - lhs.z * rhs.z
+    };
 }
 
+// Copied from DnSpy
+Vector3 Quaternion_Multiply(const Quaternion& rotation, const Vector3& point) {
+	float num = rotation.x * 2.0f;
+	float num2 = rotation.y * 2.0f;
+	float num3 = rotation.z * 2.0f;
+	float num4 = rotation.x * num;
+	float num5 = rotation.y * num2;
+	float num6 = rotation.z * num3;
+	float num7 = rotation.x * num2;
+	float num8 = rotation.x * num3;
+	float num9 = rotation.y * num3;
+	float num10 = rotation.w * num;
+	float num11 = rotation.w * num2;
+	float num12 = rotation.w * num3;
+	Vector3 result;
+	result.x = (1.0f - (num5 + num6)) * point.x + (num7 - num12) * point.y + (num8 + num11) * point.z;
+	result.y = (num7 + num12) * point.x + (1.0f - (num4 + num6)) * point.y + (num9 - num10) * point.z;
+	result.z = (num8 - num11) * point.x + (num9 + num10) * point.y + (1.0f - (num4 + num5)) * point.z;
+	return result;
+}
+
+Quaternion Quaternion_Inverse(const Quaternion &q) {
+    Quaternion ret = CRASH_UNLESS(il2cpp_utils::RunMethod<Quaternion>(cQuaternion, "Inverse", q));
+    return ret;
+}
+
+Il2CppObject* GetComponent(Il2CppObject *object, std::string_view componentNamespace, std::string_view componentClassName) {
+    auto* sysType = RET_0_UNLESS(il2cpp_utils::GetSystemType(componentNamespace, componentClassName));
+    return RET_0_UNLESS(il2cpp_utils::RunMethod(object, "GetComponent", sysType));
+}
+
+Vector3 GetAngularVelocity(const Quaternion& foreLastFrameRotation, const Quaternion& lastFrameRotation)
+{
+    auto foreLastInv = Quaternion_Inverse(foreLastFrameRotation);
+    auto q = Quaternion_Multiply(lastFrameRotation, foreLastInv);
+    if (abs(q.w) > (1023.5f / 1024.0f)) {
+        return Vector3_Zero;
+    }
+    float gain;
+    if (q.w < 0.0f) {
+        auto angle = acos(-q.w);
+        gain = (float) (-2.0f * angle / (sin(angle) * getDeltaTime()));
+    } else {
+        auto angle = acos(q.w);
+        gain = (float) (2.0f * angle / (sin(angle) * getDeltaTime()));
+    }
+
+    return {q.x * gain, q.y * gain, q.z * gain};
+}
+
+void TrickManager::AddProbe(const Vector3& vel, const Vector3& ang) {
+    if (_currentProbeIndex >= _velocityBuffer.size()) _currentProbeIndex = 0;
+    _velocityBuffer[_currentProbeIndex] = vel;
+    _angularVelocityBuffer[_currentProbeIndex] = ang;
+    _currentProbeIndex++;
+}
+
+Vector3 TrickManager::GetAverageVelocity() {
+    Vector3 avg = Vector3_Zero;
+    for (int i = 0; i < _velocityBuffer.size(); i++) {
+        avg = Vector3_Add(avg, _velocityBuffer[i]);
+    }
+    return Vector3_Divide(avg, _velocityBuffer.size());
+}
+
+Vector3 TrickManager::GetAverageAngularVelocity() {
+    Vector3 avg = Vector3_Zero;
+    for (int i = 0; i < _velocityBuffer.size(); i++) {
+        avg = Vector3_Add(avg, _angularVelocityBuffer[i]);
+    }
+    return Vector3_Divide(avg, _velocityBuffer.size());
+}
+
+void TrickManager::Start2() {
+    Il2CppObject* saberModelT;
+    Il2CppObject* basicSaberT = nullptr;
+    if (!PluginConfig::Instance().EnableTrickCutting) {
+        // Try to find a custom saber - will have same name as _saberT (LeftSaber or RightSaber) but be a child of it
+        saberModelT = il2cpp_utils::RunMethod(_saberT, "Find", _saberName).value_or(nullptr);
+        basicSaberT = CRASH_UNLESS(il2cpp_utils::RunMethod(_saberT, "Find", _basicSaberName));
+
+        if (!saberModelT) {
+            log(WARNING, "Did not find custom saber! Thrown sabers will be BasicSaberModel(Clone)!");
+            saberModelT = basicSaberT;
+        } else {
+            log(INFO, "Found '%s'!", to_utf8(csstrtostr(_saberName)).c_str());
+
+            // TODO: remove the rest of this once CustomSabers correctly creates trails and removes/moves the vanilla ones
+            // Now transfer the trail from basicSaber to saberModel (the custom saber)
+            // Find the old trail script
+            static auto* tTrail = CRASH_UNLESS(il2cpp_utils::GetSystemType("Xft", "XWeaponTrail"));
+            auto* trailComponent = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "GetComponent", tTrail));
+            if (trailComponent) {
+                // Create a new trail script on the custom saber
+                auto* saberGO = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(saberModelT, "gameObject"));
+                auto* newTrail = CRASH_UNLESS(il2cpp_utils::RunMethod(saberGO, "AddComponent", tTrail));
+
+                // Relocate the children from the BasicSaberModel(Clone) transfrom to the custom saber transform
+                // Most important children: TrailTop, TrailBottom, PointLight?
+                std::vector<Il2CppObject*> children;
+                int childCount = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(basicSaberT, "childCount"));
+                for (int i = 0; i < childCount; i++) {
+                    auto* childT = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "GetChild", i));
+                    children.push_back(childT);
+                }
+                for (auto* child : children) {
+                    CRASH_UNLESS(il2cpp_utils::RunMethod(child, "SetParent", saberModelT));
+                }
+
+                // Copy the necessary properties/fields over from old to new trail script
+                Color trailColor = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Color>(trailComponent, "color"));
+                CRASH_UNLESS(il2cpp_utils::SetPropertyValue(newTrail, "color", trailColor));
+                auto* pointStart = CRASH_UNLESS(il2cpp_utils::GetFieldValue(trailComponent, "_pointStart"));
+                CRASH_UNLESS(il2cpp_utils::SetFieldValue(newTrail, "_pointStart", pointStart));
+                auto* pointEnd = CRASH_UNLESS(il2cpp_utils::GetFieldValue(trailComponent, "_pointEnd"));
+                CRASH_UNLESS(il2cpp_utils::SetFieldValue(newTrail, "_pointEnd", pointEnd));
+                auto* trailPrefab = CRASH_UNLESS(il2cpp_utils::GetFieldValue(trailComponent, "_trailRendererPrefab"));
+                CRASH_UNLESS(il2cpp_utils::SetFieldValue(newTrail, "_trailRendererPrefab", trailPrefab));
+
+                // Destroy the old trail script
+                CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "Destroy", trailComponent));
+            }
+        }
+    } else {
+        saberModelT = Saber;
+    }
+    CRASH_UNLESS(saberModelT);
+    auto* saberGO = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(saberModelT, "gameObject"));
+    log(DEBUG, "root Saber gameObject: %p", CRASH_UNLESS(il2cpp_utils::GetPropertyValue(Saber, "gameObject")));
+    _saberTrickModel = new SaberTrickModel(saberGO, saberModelT == basicSaberT);
+    // note that this is the transform of the whole Saber (as opposed to just the model) iff TrickCutting
+    _originalSaberModelT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(saberGO, "transform"));
+}
+
+//static
+void TrickManager::Clear() {
+    _slowmoState = Inactive;
+    AudioTimeSyncController = nullptr;
+    SaberClashChecker = nullptr;
+    _audioSource = nullptr;
+}
 
 void TrickManager::Start() {
-    OVRInput = CRASH_UNLESS(il2cpp_utils::GetClassFromName("", "OVRInput"));
-    ControllerMask = *CRASH_UNLESS(il2cpp_utils::GetFieldValue<Controller>(
-        il2cpp_utils::GetClassFromName("", "OVRInput/Controller"), "All"));
+    _throwState = Inactive;
+    _spinState = Inactive;
 
-    _rigidBody = CRASH_UNLESS(GetComponent(Saber, il2cpp_utils::GetClassFromName("UnityEngine", "Rigidbody")));
-    _collider  = CRASH_UNLESS(GetComponent(Saber, il2cpp_utils::GetClassFromName("UnityEngine", "BoxCollider")));
-    _vrPlatformHelper = *CRASH_UNLESS(il2cpp_utils::GetFieldValue(VRController, "_vrPlatformHelper"));
+    if (!AudioTimeSyncController) {
+        auto* tATSC = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "AudioTimeSyncController"));
+        AudioTimeSyncController = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "FindObjectOfType", tATSC));
+        CRASH_UNLESS(AudioTimeSyncController);
+    }
+    if (!SaberClashChecker) {
+        auto* tSCC = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberClashChecker"));
+        SaberClashChecker = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "FindObjectOfType", tSCC));
+        CRASH_UNLESS(SaberClashChecker);
+    }
 
-    if (_isLeftSaber) {
-        _buttonMapping = ButtonMapping::LeftButtons;
-    } else {
-        _buttonMapping = ButtonMapping::RightButtons;
+    cQuaternion = CRASH_UNLESS(il2cpp_utils::GetClassFromName("UnityEngine", "Quaternion"));
+
+    // auto* rigidbody = CRASH_UNLESS(GetComponent(Saber, "UnityEngine", "Rigidbody"));
+
+    _collider = CRASH_UNLESS(GetComponent(Saber, "UnityEngine", "BoxCollider"));
+    _vrPlatformHelper = CRASH_UNLESS(il2cpp_utils::GetFieldValue(VRController, "_vrPlatformHelper"));
+
+    _buttonMapping = ButtonMapping(_isLeftSaber);
+
+    int velBufferSize = PluginConfig::Instance().VelocityBufferSize;
+    _velocityBuffer = std::vector<Vector3>(velBufferSize);
+    _angularVelocityBuffer = std::vector<Vector3>(velBufferSize);
+
+    _saberT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(Saber, "transform"));
+    _saberName = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(Saber, "name"));
+    log(DEBUG, "saberName: %s", to_utf8(csstrtostr(_saberName)).c_str());
+    _saberTrickModel = nullptr;
+    _originalSaberModelT = nullptr;
+    _basicSaberName = il2cpp_utils::createcsstr("BasicSaberModel(Clone)");
+
+    if (PluginConfig::Instance().EnableTrickCutting) {
+        if (!VRController_get_transform) {
+            VRController_get_transform = CRASH_UNLESS(il2cpp_utils::FindMethod("", "VRController", "get_transform"));
+        }
+        auto* basicSaberT = CRASH_UNLESS(il2cpp_utils::RunMethod(_saberT, "Find", _basicSaberName));
+        CRASH_UNLESS(basicSaberT);
+        auto* plName = CRASH_UNLESS(il2cpp_utils::createcsstr("PointLight"));
+        auto* pointLight = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "Find", plName));
+        CRASH_UNLESS(pointLight);
+        auto* fakeTransformGO = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "Instantiate", pointLight));
+        _fakeTransform = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(fakeTransformGO, "transform"));
+
+        auto* saberParentT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(_saberT, "parent"));
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_fakeTransform, "SetParent", saberParentT));
+        auto fakePos = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(_fakeTransform, "localPosition"));
+        log(DEBUG, "fakePos: {%f, %f, %f}", fakePos.x, fakePos.y, fakePos.z);
+
+        // TODO: instead of patching this transform onto the VRController, add a clone VRController component to the object?
+    }
+}
+
+void SetTimescale(float timescale) {
+    CRASH_UNLESS(il2cpp_utils::SetFieldValue(AudioTimeSyncController, "_timeScale", timescale));
+    CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_audioSource, "pitch", timescale));
+}
+
+void ForceEndSlowmo() {
+    if (_slowmoState != Inactive) {
+        SetTimescale(_targetTimeScale);
+        _slowmoState = Inactive;
+    }
+}
+
+void TrickManager::FixedUpdate() {
+    if (_slowmoState == Started) {
+        // IEnumerator ApplySlowmoSmooth
+        if (_slowmoTimeScale > _targetTimeScale) {
+            _slowmoTimeScale -= PluginConfig::Instance().SlowmoStepAmount;
+            SetTimescale(_slowmoTimeScale);
+        } else if (_slowmoTimeScale != _targetTimeScale) {
+            _slowmoTimeScale = _targetTimeScale;
+            SetTimescale(_slowmoTimeScale);
+        }
+    } else if (_slowmoState == Ending) {
+        // IEnumerator EndSlowmoSmooth
+        if (_slowmoTimeScale < _targetTimeScale) {
+            _slowmoTimeScale += PluginConfig::Instance().SlowmoStepAmount;
+            SetTimescale(_slowmoTimeScale);
+        } else if (_slowmoTimeScale != _targetTimeScale) {
+            _slowmoTimeScale = _targetTimeScale;
+            SetTimescale(_slowmoTimeScale);
+        }
     }
 }
 
 void TrickManager::Update() {
-    if (!_vrPlatformHelper) return;
-    ValueTuple trackingPos = GetTrackingPos();
-    _controllerPosition = trackingPos.item1;
-    _controllerRotation = trackingPos.item2;
-    _velocity = Vector3_Subtract(_controllerPosition, _prevPos);
-    _saberSpeed = Vector3_Distance(_controllerPosition, _prevPos);
-    _prevPos = _controllerPosition;
-    if (_getBack) {
-        float deltaTime = getDeltaTime();
-        float num = 8.0f * deltaTime;
-        // saberPos = this.Saber.transform.position;
-        auto* saberGO = *CRASH_UNLESS(il2cpp_utils::RunMethod(Saber, "get_gameObject"));
-        auto* saberTransform = *CRASH_UNLESS(il2cpp_utils::RunMethod(saberGO, "get_transform"));
-        Vector3 saberPos = *CRASH_UNLESS(il2cpp_utils::RunMethod<Vector3>(saberTransform, "get_position"));
-        saberPos = *CRASH_UNLESS(il2cpp_utils::RunMethod<Vector3>(
-            "UnityEngine", "Vector3", "Lerp", saberPos, _controllerPosition, num));
-        CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "set_position", saberPos));
-        float num2 = Vector3_Distance(_controllerPosition, saberPos);
-        if (num2 < 0.3f) {
-            ThrowEnd();
+    if (!_saberTrickModel) {
+        _timeSinceStart += getDeltaTime();
+        if (PluginConfig::Instance().EnableTrickCutting || il2cpp_utils::RunMethod(_saberT, "Find", _saberName).value_or(nullptr) ||
+                _timeSinceStart > 1) {
+            Start2();
         } else {
-            CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "Rotate", Vector3_Right, _saberRotSpeed, RotateSpace));
+            return;
         }
     }
+    // RET_V_UNLESS(il2cpp_utils::GetPropertyValue<bool>(VRController, "enabled").value_or(false));
+
+    std::optional<Quaternion> oRot;
+    if (_spinState == Ending) {  // not needed for Started because only Rotate and _currentRotation are used
+        // Note: localRotation is the same as rotation for TrickCutting, since parent is VRGameCore
+        auto tmp = il2cpp_utils::GetPropertyValue<Quaternion>(_originalSaberModelT, "localRotation");
+        oRot.swap(tmp);
+        // if (PluginConfig::Instance().EnableTrickCutting && oRot) {
+        //     log(DEBUG, "pre-manual VRController.Update rot: {%f, %f, %f, %f}", oRot->w, oRot->x, oRot->y, oRot->z);
+        // }
+    }
+
+    if (PluginConfig::Instance().EnableTrickCutting && ((_spinState != Inactive) || (_throwState != Inactive))) {
+        CRASH_UNLESS(il2cpp_utils::RunMethod(VRController, "Update"));  // sets position and pre-_currentRotation
+    }
+
+    // Note: iff TrickCutting, during throw, these properties are redirected to an unused object
+    _controllerPosition = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(VRController, "position"));
+    _controllerRotation = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Quaternion>(VRController, "rotation"));
+
+    auto dPos = Vector3_Subtract(_controllerPosition, _prevPos);
+    auto velocity = Vector3_Divide(dPos, getDeltaTime());
+    _angularVelocity = GetAngularVelocity(_prevRot, _controllerRotation);
+
+    float mag = Vector3_Magnitude(_angularVelocity);
+    // if (mag) log(DEBUG, "angularVelocity.x: %f, .y: %f, mag: %f", _angularVelocity.x, _angularVelocity.y, mag);
+    AddProbe(velocity, _angularVelocity);
+    _saberSpeed = Vector3_Magnitude(velocity);
+    _prevPos = _controllerPosition;
+    _prevRot = _controllerRotation;
+
+    // TODO: move these to LateUpdate?
+    if (_throwState == Ending) {
+        auto& d = _throwReturnDirection;
+        float distance = Vector3_Magnitude(d);
+        log(DEBUG, "distance: %f", distance);
+
+        if (distance <= PluginConfig::Instance().ControllerSnapThreshold) {
+            ThrowEnd();
+        } else {
+            float speed = PluginConfig::Instance().ReturnSpeed;
+            float force = (distance < 1.0f) ? speed: speed * distance;
+            // float magToCoverDistanceInOneFrame = distance / getDeltaTime();
+            // float minForce = fmin(speed, magToCoverDistanceInOneFrame);
+            force = std::clamp(force, 0.0f, 200.0f);
+            // log(DEBUG, "mag: %f, minMag = %f (vs. %f)", mag, minMag, magToCoverDistanceInOneFrame);
+            auto normalized = CRASH_UNLESS(il2cpp_utils::FindProperty("UnityEngine", "Vector3", "normalized"));
+            auto dirNorm = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(&d, normalized));
+            auto newVel = Vector3_Multiply(dirNorm, force);
+
+            CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "velocity", newVel));
+
+            Vector3 saberPos = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(_saberTrickModel->Rigidbody, "position"));
+            _throwReturnDirection = Vector3_Subtract(_controllerPosition, saberPos);
+        }
+    }
+    if (_spinState == Ending) {
+        auto rot = CRASH_UNLESS(oRot);
+        auto targetRot = PluginConfig::Instance().EnableTrickCutting ? _controllerRotation: Quaternion_Identity;
+
+        float angle = CRASH_UNLESS(il2cpp_utils::RunMethod<float>(cQuaternion, "Angle", rot, targetRot));
+        // log(DEBUG, "angle: %f (%f)", angle, 360.0f - angle);
+        if (PluginConfig::Instance().CompleteRotationMode) {
+            float minSpeed = 8.0f;
+            float returnSpinSpeed = _finalSpinSpeed;
+            if (abs(returnSpinSpeed) < minSpeed) {
+                returnSpinSpeed = returnSpinSpeed < 0 ? -minSpeed : minSpeed;
+            }
+            float threshold = abs(returnSpinSpeed) + 0.1f;
+            // TODO: cache returnSpinSpeed (and threshold?) in InPlaceRotationReturn
+            if (angle <= threshold) {
+                InPlaceRotationEnd();
+            } else {
+                _InPlaceRotate(returnSpinSpeed);
+            }
+        } else {  // LerpToOriginalRotation
+            if (angle <= 5.0f) {
+                InPlaceRotationEnd();
+            } else {
+                rot = CRASH_UNLESS(il2cpp_utils::RunMethod<Quaternion>(
+                    cQuaternion, "Lerp", rot, targetRot, getDeltaTime() * 20.0f));
+                CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_originalSaberModelT, "localRotation", rot));
+            }
+        }
+    }
+    // TODO: no tricks while paused? https://github.com/ToniMacaroni/TrickSaber/blob/ea60dce35db100743e7ba72a1ffbd24d1472f1aa/TrickSaber/SaberTrickManager.cs#L66
     CheckButtons();
 }
 
 ValueTuple TrickManager::GetTrackingPos() {
-    XRNode controllerNode = *CRASH_UNLESS(il2cpp_utils::RunMethod<XRNode>(VRController, "get_node"));
-    int controllerNodeIdx = *CRASH_UNLESS(il2cpp_utils::RunMethod<int>(VRController, "get_nodeIdx"));
+    XRNode controllerNode = CRASH_UNLESS(il2cpp_utils::RunMethod<XRNode>(VRController, "get_node"));
+    int controllerNodeIdx = CRASH_UNLESS(il2cpp_utils::RunMethod<int>(VRController, "get_nodeIdx"));
 
     ValueTuple result;
-    bool nodePose = *CRASH_UNLESS(il2cpp_utils::RunMethod<bool>(_vrPlatformHelper, "GetNodePose", controllerNode,
+    bool nodePose = CRASH_UNLESS(il2cpp_utils::RunMethod<bool>(_vrPlatformHelper, "GetNodePose", controllerNode,
         controllerNodeIdx, result.item1, result.item2));
     if (!nodePose) {
+        log(WARNING, "Node pose missing for %s controller!", _isLeftSaber ? "Left": "Right");
         result.item1 = {-0.2f, 0.05f, 0.0f};
         result.item2 = {0.0f, 0.0f, 0.0f, 1.0f};
     }
     return result;
 }
 
-void TrickManager::CheckButtons() {
-    if (!OVRInput) {
-        OVRInput = il2cpp_utils::GetClassFromName("", "OVRInput");
+bool CheckHandlersDown(decltype(ButtonMapping::actionHandlers)::mapped_type handlers, float& power) {
+    power = 0;
+    // log(DEBUG, "handlers.size(): %lu", handlers.size());
+    CRASH_UNLESS(handlers.size() > 0);
+    if (handlers.size() == 0) return false;
+    for (auto* handler : handlers) {
+        float val;
+        if (!handler->Activated(val)) {
+            return false;
+        }
+        power += val;
     }
+    power /= handlers.size();
+    return true; 
+}
 
-    if (!_getBack &&
-            *CRASH_UNLESS(il2cpp_utils::RunMethod<bool>(OVRInput, "Get", _buttonMapping.ThrowButton, ControllerMask))) {
+bool CheckHandlersUp(decltype(ButtonMapping::actionHandlers)::mapped_type handlers) {
+    for (auto* handler : handlers) {
+        if (handler->Deactivated()) return true;
+    }
+    return false;
+}
+
+void TrickManager::CheckButtons() {
+    float power;
+    if ((_throwState != Ending) && CheckHandlersDown(_buttonMapping.actionHandlers[TrickAction::Throw], power)) {
         ThrowStart();
-    } else if (!_getBack &&
-            *CRASH_UNLESS(il2cpp_utils::RunMethod<bool>(OVRInput, "GetUp", _buttonMapping.ThrowButton, ControllerMask))) {
+    } else if ((_throwState == Started) && CheckHandlersUp(_buttonMapping.actionHandlers[TrickAction::Throw])) {
         ThrowReturn();
-    } else if (!_isThrowing && !_getBack &&
-            *CRASH_UNLESS(il2cpp_utils::RunMethod<bool>(OVRInput, "Get", _buttonMapping.RotateButton, ControllerMask))) {
-        InPlaceRotation();
-    } else if (_isRotatingInPlace &&
-            *CRASH_UNLESS(il2cpp_utils::RunMethod<bool>(OVRInput, "GetUp", _buttonMapping.RotateButton, ControllerMask))) {
-        InPlaceRotationEnd();
+    } else if ((_throwState == Inactive) && CheckHandlersDown(_buttonMapping.actionHandlers[TrickAction::Spin], power)) {
+        InPlaceRotation(power);
+    } else if ((_spinState == Started) && CheckHandlersUp(_buttonMapping.actionHandlers[TrickAction::Spin])) {
+        InPlaceRotationReturn();
     }
 }
 
 
-void TrickManager::ThrowStart() {
-    log(DEBUG, "%s throw start!", _isLeftSaber ? "Left" : "Right");
-    if (!_isThrowing) {
+void TrickManager::TrickStart() {
+    if (PluginConfig::Instance().EnableTrickCutting) {
+        // even on throws, we disable this to call Update manually and thus control ordering
         CRASH_UNLESS(il2cpp_utils::RunMethod(VRController, "set_enabled", false));
-        CRASH_UNLESS(il2cpp_utils::RunMethod(_rigidBody, "set_isKinematic", false));
-        Vector3 velo = Vector3_Multiply(_velocity, 220.0F);
-        CRASH_UNLESS(il2cpp_utils::RunMethod(_rigidBody, "set_velocity", velo));
-        CRASH_UNLESS(il2cpp_utils::RunMethod(_collider, "set_enabled", false));
-        _saberRotSpeed = _saberSpeed * 400.0f;
-        _isThrowing = true;
+    } else {
+        CRASH_UNLESS(il2cpp_utils::SetPropertyValue(SaberClashChecker, "enabled", false));
+    }
+}
+
+void TrickManager::TrickEnd() {
+    if (PluginConfig::Instance().EnableTrickCutting) {
+        CRASH_UNLESS(il2cpp_utils::RunMethod(VRController, "set_enabled", true));
+    } else if ((other->_throwState == Inactive) && (other->_spinState == Inactive)) {
+        CRASH_UNLESS(il2cpp_utils::SetPropertyValue(SaberClashChecker, "enabled", true));
+    }
+}
+
+void ListActiveChildren(Il2CppObject* root, std::string_view name) {
+    auto* rootT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(root, "transform"));
+    std::queue<Il2CppObject*> frontier;
+    frontier.push(rootT);
+    while (!frontier.empty()) {
+        auto* transform = frontier.front();
+        auto* go = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(transform, "gameObject"));
+        auto* goName = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(go, "name"));
+        std::string parentName = to_utf8(csstrtostr(goName));
+        frontier.pop();
+        int children = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(transform, "childCount"));
+        for (int i = 0; i < children; i++) {
+            auto* childT = CRASH_UNLESS(il2cpp_utils::RunMethod(transform, "GetChild", i));
+            if (childT) {
+                auto* child = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(childT, "gameObject"));
+                if (CRASH_UNLESS(il2cpp_utils::GetPropertyValue<bool>(child, "activeInHierarchy"))) {
+                    goName = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(child, "name"));
+                    std::string childName = to_utf8(csstrtostr(goName));
+                    log(DEBUG, "found %s child '%s'", name.data(), (parentName + "/" + childName).c_str());
+                }
+                frontier.push(childT);
+            }
+        }
+    }
+}
+
+void TrickManager::ThrowStart() {
+    if (_throwState == Inactive) {
+        log(DEBUG, "%s throw start!", _isLeftSaber ? "Left" : "Right");
+
+        if (!PluginConfig::Instance().EnableTrickCutting) {
+            _saberTrickModel->ChangeToTrickModel();
+            // ListActiveChildren(Saber, "Saber");
+            // ListActiveChildren(_saberTrickModel->SaberGO, "custom saber");
+        } else {
+            CRASH_UNLESS(il2cpp_utils::RunMethod(_collider, "set_enabled", false));
+        }
+        TrickStart();
+
+        auto* rigidBody = _saberTrickModel->Rigidbody;
+        CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidBody, "isKinematic", false));
+
+        Vector3 velo = GetAverageVelocity();
+        float _velocityMultiplier = PluginConfig::Instance().ThrowVelocity;
+        velo = Vector3_Multiply(velo, 3 * _velocityMultiplier);
+        CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidBody, "velocity", velo));
+
+        _saberRotSpeed = _saberSpeed * _velocityMultiplier;
+        // log(DEBUG, "initial _saberRotSpeed: %f", _saberRotSpeed);
+        if (_angularVelocity.x > 0) {
+            _saberRotSpeed *= 150;
+        } else {
+            _saberRotSpeed *= -150;
+        }
+
+        auto* saberTransform = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(rigidBody, "transform"));
+        log(DEBUG, "velocity: %f", Vector3_Magnitude(velo));
+        log(DEBUG, "_saberRotSpeed: %f", _saberRotSpeed);
+        auto torqRel = Vector3_Multiply(Vector3_Right, _saberRotSpeed);
+        auto torqWorld = CRASH_UNLESS(il2cpp_utils::RunMethod<Vector3>(saberTransform, "TransformVector", torqRel));
+        // 5 == ForceMode.Acceleration
+        CRASH_UNLESS(il2cpp_utils::RunMethod(rigidBody, "AddTorque", torqWorld, 5));
+
+        if (PluginConfig::Instance().EnableTrickCutting) {
+            fakeTransforms.emplace(VRController, _fakeTransform);
+            if (!VRController_transform_is_hooked) {
+                INSTALL_HOOK_OFFSETLESS(VRController_get_transform_hook, VRController_get_transform);
+                VRController_transform_is_hooked = true;
+            }
+        }
+
+        _throwState = Started;
+
+        if (PluginConfig::Instance().SlowmoDuringThrow && _slowmoState != Started) {
+            // ApplySlowmoSmooth
+            log(DEBUG, "Starting slowmo");
+            _audioSource = CRASH_UNLESS(il2cpp_utils::GetFieldValue(AudioTimeSyncController, "_audioSource"));
+            _slowmoTimeScale = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<float>(AudioTimeSyncController, "timeScale"));
+            _originalTimeScale = (_slowmoState == Inactive) ? _slowmoTimeScale : _targetTimeScale;
+
+            _targetTimeScale = _originalTimeScale - PluginConfig::Instance().SlowmoAmount;
+            if (_targetTimeScale < 0.1f) _targetTimeScale = 0.1f;
+            _slowmoState = Started;
+        }
+    } else {
+        log(DEBUG, "%s throw continues", _isLeftSaber ? "Left" : "Right");
     }
 
-    ThrowUpdate();
+    // ThrowUpdate();  // not needed as long as the velocity and torque do their job
 }
 
 void TrickManager::ThrowUpdate() {
-    // saberPos = this.Saber.transform.position;
-    auto* saberGO = *CRASH_UNLESS(il2cpp_utils::RunMethod(Saber, "get_gameObject"));
-    auto* saberTransform = *CRASH_UNLESS(il2cpp_utils::RunMethod(saberGO, "get_transform"));
-    CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "Rotate", Vector3_Right, _saberRotSpeed, RotateSpace));
+    // auto* saberTransform = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(_saberTrickModel->SaberGO, "transform"));
+    // // // For when AddTorque doesn't work
+    // // CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "Rotate", Vector3_Right, _saberRotSpeed, RotateSpace));
+
+    // auto rot = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Quaternion>(saberTransform, "rotation"));
+    // auto angVel = GetAngularVelocity(_prevTrickRot, rot);
+    // log(DEBUG, "angVel.x: %f, .y: %f, mag: %f", angVel.x, angVel.y, Vector3_Magnitude(angVel));
+    // _prevTrickRot = rot;
 }
 
 void TrickManager::ThrowReturn() {
-    if (_isThrowing) {
-        CRASH_UNLESS(il2cpp_utils::RunMethod(_rigidBody, "set_isKinematic", true));
-        CRASH_UNLESS(il2cpp_utils::RunMethod(_rigidBody, "set_velocity", Vector3_Zero));
-        _getBack = true;
-        _isThrowing = false;
+    if (_throwState == Started) {
+        log(DEBUG, "%s throw return!", _isLeftSaber ? "Left" : "Right");
+        CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "velocity", Vector3_Zero));
+        _throwState = Ending;
+
+        Vector3 saberPos = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(_saberTrickModel->Rigidbody, "position"));
+        _throwReturnDirection = Vector3_Subtract(_controllerPosition, saberPos);
+
+        if ((_slowmoState == Started) && (other->_throwState != Started)) {
+            _slowmoTimeScale = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<float>(AudioTimeSyncController, "timeScale"));
+            _targetTimeScale = _originalTimeScale;
+            _audioSource = CRASH_UNLESS(il2cpp_utils::GetFieldValue(AudioTimeSyncController, "_audioSource"));
+            _slowmoState = Ending;
+        }
     }
 }
 
 void TrickManager::ThrowEnd() {
-    _getBack = false;
-    CRASH_UNLESS(il2cpp_utils::RunMethod(_collider, "set_enabled", true));
-    CRASH_UNLESS(il2cpp_utils::RunMethod(VRController, "set_enabled", true));
+    log(DEBUG, "%s throw end!", _isLeftSaber ? "Left" : "Right");
+    CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "isKinematic", true));  // restore
+    if (!PluginConfig::Instance().EnableTrickCutting) {
+        _saberTrickModel->ChangeToActualSaber();
+    } else {
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_collider, "set_enabled", true));
+        fakeTransforms.erase(VRController);
+    }
+    if (other->_throwState == Inactive) {
+        ForceEndSlowmo();
+    }
+    _throwState = Inactive;
+    TrickEnd();
 }
 
 
 void TrickManager::InPlaceRotationStart() {
     log(DEBUG, "%s rotate start!", _isLeftSaber ? "Left" : "Right");
-    _currentRotation = 0.0f;
-    CRASH_UNLESS(il2cpp_utils::RunMethod(VRController, "set_enabled", false));
-    _isRotatingInPlace = true;
+    TrickStart();
+    if (PluginConfig::Instance().EnableTrickCutting) {
+        _currentRotation = 0.0f;
+    }
+
+    if (PluginConfig::Instance().IsVelocityDependent) {
+        auto angularVelocity = GetAverageAngularVelocity();
+        _spinSpeed = abs(angularVelocity.x) + abs(angularVelocity.y);
+        // log(DEBUG, "_spinSpeed: %f", _spinSpeed);
+        auto contRotInv = Quaternion_Inverse(_controllerRotation);
+        angularVelocity = Quaternion_Multiply(contRotInv, angularVelocity);
+        if (angularVelocity.x < 0) _spinSpeed *= -1;
+    } else {
+        float speed = 30;
+        if (PluginConfig::Instance().SpinDirection == SpinDir::Backward) speed *= -1;
+        _spinSpeed = speed;
+    }
+    _spinSpeed *= PluginConfig::Instance().SpinSpeed;
+    _spinState = Started;
+}
+
+void TrickManager::InPlaceRotationReturn() {
+    log(DEBUG, "%s spin return!", _isLeftSaber ? "Left" : "Right");
+    _spinState = Ending;
+    // where the PC mod would start a coroutine here, we'll wind the spin down starting in next TrickManager::Update
+    // so just to maintain the movement: (+ restore the rotation that was reset by VRController.Update iff TrickCutting)
+    _InPlaceRotate(_finalSpinSpeed);
 }
 
 void TrickManager::InPlaceRotationEnd() {
-    _isRotatingInPlace = false;
-    CRASH_UNLESS(il2cpp_utils::RunMethod(VRController, "set_enabled", true));
+    if (!PluginConfig::Instance().EnableTrickCutting) {
+        CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_originalSaberModelT, "localRotation", Quaternion_Identity));
+    }
+    log(DEBUG, "%s spin end!", _isLeftSaber ? "Left" : "Right");
+    _spinState = Inactive;
+    TrickEnd();
 }
 
-void TrickManager::InPlaceRotation() {
-    if (!_isRotatingInPlace) {
+void TrickManager::_InPlaceRotate(float amount) {
+    if (!PluginConfig::Instance().EnableTrickCutting) {
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_originalSaberModelT, "Rotate", Vector3_Right, amount, RotateSpace));
+    } else {
+        _currentRotation += amount;
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_originalSaberModelT, "Rotate", Vector3_Right, _currentRotation, RotateSpace));
+    }
+}
+
+void TrickManager::InPlaceRotation(float power) {
+    if (_spinState == Inactive) {
         InPlaceRotationStart();
+    } else {
+        log(DEBUG, "%s rotation continues!", _isLeftSaber ? "Left" : "Right");
     }
 
-    auto* saberGO = *CRASH_UNLESS(il2cpp_utils::RunMethod(Saber, "get_gameObject"));
-    auto* saberTransform = *CRASH_UNLESS(il2cpp_utils::RunMethod(saberGO, "get_transform"));
-    CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "set_rotation", _controllerRotation));
-    CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "set_position", _controllerPosition));
-    _currentRotation -= 18.0F;
-    CRASH_UNLESS(il2cpp_utils::RunMethod(saberTransform, "Rotate", Vector3_Right, _currentRotation, RotateSpace));
+    if (PluginConfig::Instance().IsVelocityDependent) {
+        _finalSpinSpeed = _spinSpeed;
+    } else {
+        _finalSpinSpeed = _spinSpeed * pow(power, 3);  // power is the degree to which the held buttons are pressed
+    }
+    _InPlaceRotate(_finalSpinSpeed);
 }

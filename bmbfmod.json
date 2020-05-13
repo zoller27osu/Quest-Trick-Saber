@@ -1,13 +1,13 @@
 {
     "id": "tricksaber",
     "name": "TrickSaber",
-    "author": "Rugtveit",
+    "author": "ToniMacaroni",
     "description": [
-        
+        "Ported by zoller27osu. See https://tonimacaroni.github.io/TrickSaber-Docs/Configuration for config explanations."
     ],
     "category": "Gameplay",
-    "gameVersion": "1.8.0",
-    "version": "0.1.0",
+    "gameVersion": "1.9.1",
+    "version": "0.2.0",
     "platform": "Quest",
     "components": [
         {
