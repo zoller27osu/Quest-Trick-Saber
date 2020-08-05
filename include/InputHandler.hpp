@@ -1,6 +1,7 @@
 #pragma once
 
 #include <math.h>
+#include "extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
 
 class InputHandler {
   private:

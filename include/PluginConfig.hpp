@@ -1,17 +1,16 @@
 #pragma once
 
+#include "main.hpp"
 #include "ConfigEnums.hpp"
 
 #include <string>
 #include <unordered_map>
 
-#include "../extern/beatsaber-hook/shared/config/config-utils.hpp"
+#include "extern/beatsaber-hook/shared/config/config-utils.hpp"
 
 
 class PluginConfig {
   private:
-	inline static auto& config = Configuration::config;
-
 	typedef std::unordered_map<std::string, rapidjson::Value> ConfigDefaultsMap;
 	static ConfigDefaultsMap InitializeConfigDefaults() {
 		ConfigDefaultsMap def;
@@ -65,7 +64,7 @@ class PluginConfig {
 
 	static auto& GetOrAddDefault(ConfigDocument& config, std::string_view member) {
 		if (!config.HasMember(member.data())) {
-			log(ERROR, "config was missing property '%s'! Adding default value to config file.", member.data());
+			logger().error("config was missing property '%s'! Adding default value to config file.", member.data());
 			AddDefault(config, member);
 		}
 		return config[member.data()];
@@ -80,7 +79,7 @@ class PluginConfig {
 		auto& possible = enumValues.at(member.c_str());
 		CRASH_UNLESS(possible.size());
 		if (!possible.count(val)) {
-			log(ERROR, "config had invalid value '%s' for property '%s'! Setting to default.", val, member.data());
+			logger().error("config had invalid value '%s' for property '%s'! Setting to default.", val, member.data());
 			config[member.data()] = ConfigValue(configDefaults.at(member.c_str()), config.GetAllocator());
 			val = config[member.data()].GetString();
 		}
@@ -88,17 +87,18 @@ class PluginConfig {
 	}
 
 	// this method should never need to be changed
-	static void CheckRegenConfig(ConfigDocument& config) {
-		if (!config.HasMember("regenerateConfig") || config["regenerateConfig"].GetBool()) {
-			log(WARNING, "Regenerating config!");
-			config.SetObject();
+	static void CheckRegenConfig(Configuration& config) {
+		auto& doc = config.config;
+		if (!doc.HasMember("regenerateConfig") || doc["regenerateConfig"].GetBool()) {
+			logger().warning("Regenerating config!");
+			doc.SetObject();
 			for (auto&& p : configDefaults) {
-				AddDefault(config, p.first);
+				AddDefault(doc, p.first);
 			}
-			Configuration::Write();
-			log(INFO, "Config regeneration complete!");
+			config.Write();
+			logger().info("Config regeneration complete!");
 		} else {
-			log(INFO, "Not regnerating config.");
+			logger().info("Not regnerating config.");
 		}
 	}
 
@@ -112,9 +112,14 @@ class PluginConfig {
 		return instance;
 	}
 
+	static Configuration& config() {
+		static Configuration config(modInfo);
+		return config;
+	}
+
 	static void Init() {
-		Configuration::Load();
-		CheckRegenConfig(config);
+		config().Load();
+		CheckRegenConfig(config());
 	}
 
 	// config fields

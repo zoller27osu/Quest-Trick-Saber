@@ -3,7 +3,6 @@
 #include "InputHandler.hpp"
 #include "PluginConfig.hpp"
 #include "AllEnums.hpp"
-#include "../extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
 
 class TriggerHandler : public InputHandler {
   private:
@@ -20,7 +19,7 @@ class TriggerHandler : public InputHandler {
     float GetInputValue() {
         static auto* klass = CRASH_UNLESS(il2cpp_utils::GetClassFromName("UnityEngine", "Input"));
         auto val = CRASH_UNLESS(il2cpp_utils::RunMethod<float>(klass, "GetAxis", _inputString));
-        // if (val != 0) log(DEBUG, "TriggerHandler input value: %f", val);
+        // if (val != 0) logger().debug("TriggerHandler input value: %f", val);
         return val;
     }
 };

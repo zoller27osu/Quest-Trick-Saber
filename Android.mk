@@ -11,26 +11,41 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+#
+#
+#
 LOCAL_PATH := $(call my-dir)
 TARGET_ARCH_ABI := $(APP_ABI)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := hook
-
 rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
 
+# Creating prebuilt for dependency: modloader - version: 0.1.1
 include $(CLEAR_VARS)
-LOCAL_LDLIBS     += -llog
-LOCAL_CFLAGS     += -DMOD_ID='"tricksaber"' -DVERSION='"0.2.0"' -I'C:\Unity\2019.3.2f1\Editor\Data\il2cpp\libil2cpp'
-LOCAL_MODULE     := tricksaber
-LOCAL_C_INCLUDES := ./include ./src
-LOCAL_SRC_FILES  := $(call rwildcard,extern/beatsaber-hook/shared/inline-hook/,*.cpp) $(call rwildcard,extern/beatsaber-hook/shared/utils/,*.cpp) $(call rwildcard,extern/beatsaber-hook/shared/inline-hook/,*.c)
-# In order to add configuration support to your project, uncomment the following line:
-LOCAL_SRC_FILES  += $(call rwildcard,extern/beatsaber-hook/shared/config/,*.cpp)
-# In order to add custom UI support to your project, uncomment the following line:
-# LOCAL_SRC_FILES  += $(call rwildcard,extern/beatsaber-hook/shared/customui/,*.cpp)
-# Add any new SRC includes from beatsaber-hook or other external libraries here
-LOCAL_SRC_FILES  += $(call rwildcard,src/,*.cpp)
+LOCAL_MODULE := modloader
+LOCAL_EXPORT_C_INCLUDES := extern/modloader
+LOCAL_SRC_FILES := extern/libmodloader.so
+include $(PREBUILT_SHARED_LIBRARY)
+# Creating prebuilt for dependency: beatsaber-hook - version: 0.3.4
+include $(CLEAR_VARS)
+LOCAL_MODULE := beatsaber-hook
+LOCAL_EXPORT_C_INCLUDES := extern/beatsaber-hook
+LOCAL_SRC_FILES := extern/libbeatsaber-hook_0_3_5.so
+include $(PREBUILT_SHARED_LIBRARY)
+# Creating prebuilt for dependency: bs-utils - version: 0.1.3
+include $(CLEAR_VARS)
+LOCAL_MODULE := bs-utils
+LOCAL_EXPORT_C_INCLUDES := extern/bs-utils
+LOCAL_SRC_FILES := extern/libbs-utils_0_2_0.so
+include $(PREBUILT_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := tricksaber
+LOCAL_SRC_FILES += $(call rwildcard,src/,*.cpp)
+LOCAL_SRC_FILES += $(call rwildcard,extern/beatsaber-hook/src/inline-hook/,*.cpp)
+LOCAL_SRC_FILES += $(call rwildcard,extern/beatsaber-hook/src/inline-hook/,*.c)
+LOCAL_SHARED_LIBRARIES += modloader
+LOCAL_SHARED_LIBRARIES += beatsaber-hook
+LOCAL_SHARED_LIBRARIES += bs-utils
+LOCAL_LDLIBS += -llog
+LOCAL_CFLAGS += -I'C:\Unity\2019.3.2f1\Editor\Data\il2cpp\libil2cpp' -isystem 'extern'
+LOCAL_C_INCLUDES += ./include ./src
 include $(BUILD_SHARED_LIBRARY)

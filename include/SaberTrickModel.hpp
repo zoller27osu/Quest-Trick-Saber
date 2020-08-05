@@ -1,9 +1,9 @@
 #pragma once
 
 #include "PluginConfig.hpp"
-#include "../extern/beatsaber-hook/shared/utils/il2cpp-functions.hpp"
-#include "../extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
-#include "../extern/beatsaber-hook/shared/utils/utils.h"
+#include "extern/beatsaber-hook/shared/utils/il2cpp-functions.hpp"
+#include "extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
+#include "extern/beatsaber-hook/shared/utils/utils.h"
 
 class SaberTrickModel {
   public:
@@ -20,7 +20,7 @@ class SaberTrickModel {
         if (PluginConfig::Instance().EnableTrickCutting) {
             Rigidbody = CRASH_UNLESS(il2cpp_utils::RunMethod(SaberModel, "GetComponent", tRigidbody));
             if (!Rigidbody) {
-                log(WARNING, "Adding rigidbody to original SaberModel?!");
+                logger().warning("Adding rigidbody to original SaberModel?!");
                 Rigidbody = CRASH_UNLESS(il2cpp_utils::RunMethod(SaberModel, "AddComponent", tRigidbody));
             }
             SetupRigidbody(Rigidbody, OriginalSaberModel);
@@ -44,15 +44,15 @@ class SaberTrickModel {
         CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidbody, "isKinematic", true));
 
         auto* set_detectCollisions = CRASH_UNLESS(il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::set_detectCollisions"));
-        log(DEBUG, "set_detectCollisions ptr offset: %lX", asOffset(set_detectCollisions));
+        logger().debug("set_detectCollisions ptr offset: %lX", asOffset(set_detectCollisions));
         ((function_ptr_t<void, Il2CppObject*, bool>)(set_detectCollisions))(rigidbody, false);
 
         auto* set_maxAngVel = CRASH_UNLESS(il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::set_maxAngularVelocity"));
-        log(DEBUG, "set_maxAngVel ptr offset: %lX", asOffset(set_maxAngVel));
+        logger().debug("set_maxAngVel ptr offset: %lX", asOffset(set_maxAngVel));
         ((function_ptr_t<void, Il2CppObject*, float>)(set_maxAngVel))(rigidbody, 800.0f);
 
         auto* set_interp = CRASH_UNLESS(il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::set_interpolation"));
-        log(DEBUG, "set_interpolation ptr offset: %lX", asOffset(set_interp));
+        logger().debug("set_interpolation ptr offset: %lX", asOffset(set_interp));
         ((function_ptr_t<void, Il2CppObject*, int>)(set_interp))(rigidbody, 1);  // Interpolate
     }
 
@@ -83,14 +83,14 @@ class SaberTrickModel {
         CRASH_UNLESS(il2cpp_utils::SetFieldValue(saberModelController, "_colorManager", colorMgr));
 
         auto* glows = CRASH_UNLESS(il2cpp_utils::GetFieldValue<Il2CppArray*>(saberModelController, "_setSaberGlowColors"));
-        log(INFO, "_setSaberGlowColors.length: %u", il2cpp_functions::array_length(glows));
+        logger().info("_setSaberGlowColors.length: %u", il2cpp_functions::array_length(glows));
         for (int i = 0; i < il2cpp_functions::array_length(glows); i++) {
             auto* obj = il2cpp_array_get(glows, Il2CppObject*, i);
             CRASH_UNLESS(il2cpp_utils::SetFieldValue(obj, "_colorManager", colorMgr));
         }
 
         auto* fakeGlows = CRASH_UNLESS(il2cpp_utils::GetFieldValue<Il2CppArray*>(saberModelController, "_setSaberFakeGlowColors"));
-        log(INFO, "_setSaberFakeGlowColors.length: %u", il2cpp_functions::array_length(fakeGlows));
+        logger().info("_setSaberFakeGlowColors.length: %u", il2cpp_functions::array_length(fakeGlows));
         for (int i = 0; i < il2cpp_functions::array_length(fakeGlows); i++) {
             auto* obj = il2cpp_array_get(fakeGlows, Il2CppObject*, i);
             CRASH_UNLESS(il2cpp_utils::SetFieldValue(obj, "_colorManager", colorMgr));

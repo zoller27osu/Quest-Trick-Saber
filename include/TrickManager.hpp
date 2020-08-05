@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "../extern/beatsaber-hook/shared/utils/typedefs.h"
+#include "extern/beatsaber-hook/shared/utils/typedefs.h"
 #include "AllEnums.hpp"
 #include "InputHandler.hpp"
 #include "SaberTrickModel.hpp"
@@ -57,6 +57,7 @@ class TrickManager {
         Il2CppObject* VRController;  // ::VRController
 		TrickManager* other = nullptr;
 		void Start();
+		void EndTricks();
 		static void Clear();
 		static void FixedUpdate();
         void Update();

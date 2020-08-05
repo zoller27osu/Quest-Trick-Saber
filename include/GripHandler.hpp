@@ -5,7 +5,6 @@
 #include "InputHandler.hpp"
 #include "PluginConfig.hpp"
 #include "AllEnums.hpp"
-#include "../extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
 
 class GripHandler : public InputHandler {
   private:
@@ -47,7 +46,7 @@ class GripHandler : public InputHandler {
 
     float GetInputValue() {
         auto val = CALL_MEMFN_ON_PTR(this, _valueFunc)();
-        // if (val != 0) log(DEBUG, "GripHandler input value: %f", val);
+        // if (val != 0) logger().debug("GripHandler input value: %f", val);
         return val;
     }
 };
