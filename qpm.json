@@ -1,0 +1,31 @@
+{
+  "sharedDir": "shared",
+  "dependenciesDir": "extern",
+  "info": {
+    "name": "TrickSaber",
+    "id": "TrickSaber",
+    "version": "0.2.0",
+    "url": "https://github.com/zoller27osu/Quest-Trick-Saber",
+    "additionalData": {
+      "soLink": "https://github.com/zoller27osu/Quest-Trick-Saber/releases/download/v0.2.0/libtricksaber.so",
+      "debugSoLink": "https://github.com/zoller27osu/Quest-Trick-Saber/releases/download/v0.2.0/libtricksaber_debug.so"
+    }
+  },
+  "dependencies": [
+    {
+      "id": "beatsaber-hook",
+      "versionRange": "^0.3.5",
+      "additionalData": {
+        "extraFiles": [
+          "src/inline-hook"
+        ]
+      }
+    },
+    {
+      "id": "bs-utils",
+      "versionRange": "^0.2.0",
+      "additionalData": {}
+    }
+  ],
+  "additionalData": {}
+}
