@@ -521,7 +521,7 @@ void TrickManager::CheckButtons() {
         ThrowStart();
     } else if ((_throwState == Started) && CheckHandlersUp(_buttonMapping.actionHandlers[TrickAction::Throw])) {
         ThrowReturn();
-    } else if ((_throwState == Inactive) && CheckHandlersDown(_buttonMapping.actionHandlers[TrickAction::Spin], power)) {
+    } else if ((_spinState != Ending) && CheckHandlersDown(_buttonMapping.actionHandlers[TrickAction::Spin], power)) {
         InPlaceRotation(power);
     } else if ((_spinState == Started) && CheckHandlersUp(_buttonMapping.actionHandlers[TrickAction::Spin])) {
         InPlaceRotationReturn();
@@ -738,7 +738,7 @@ void TrickManager::InPlaceRotation(float power) {
     if (_spinState == Inactive) {
         InPlaceRotationStart();
     } else {
-        logger().debug("%s rotation continues!", _isLeftSaber ? "Left" : "Right");
+        logger().debug("%s rotation continues! power %f", _isLeftSaber ? "Left" : "Right", power);
     }
 
     if (PluginConfig::Instance().IsVelocityDependent) {
