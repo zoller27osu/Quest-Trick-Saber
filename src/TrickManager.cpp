@@ -17,6 +17,7 @@ static float _slowmoTimeScale;
 static float _originalTimeScale;
 static float _targetTimeScale;
 static Il2CppObject* _audioSource;
+static function_ptr_t<void, Il2CppObject*> RigidbodySleep;
 
 
 static const MethodInfo* VRController_get_transform = nullptr;
@@ -214,11 +215,6 @@ Vector3 TrickManager::GetAverageAngularVelocity() {
     return Vector3_Divide(avg, _velocityBuffer.size());
 }
 
-void TrickManager::EndTricks() {
-    ThrowReturn();
-    InPlaceRotationReturn();
-}
-
 void TrickManager::Start2() {
     Il2CppObject* saberModelT;
     Il2CppObject* basicSaberT = nullptr;
@@ -301,6 +297,10 @@ void TrickManager::Start() {
         auto* tSCC = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberClashChecker"));
         SaberClashChecker = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "FindObjectOfType", tSCC));
         CRASH_UNLESS(SaberClashChecker);
+    }
+    if (!RigidbodySleep) {
+        RigidbodySleep = (decltype(RigidbodySleep))CRASH_UNLESS(il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::Sleep"));
+        logger().debug("RigidbodySleep ptr offset: %lX", asOffset(RigidbodySleep));
     }
 
     cQuaternion = CRASH_UNLESS(il2cpp_utils::GetClassFromName("UnityEngine", "Quaternion"));
@@ -572,6 +572,37 @@ void ListActiveChildren(Il2CppObject* root, std::string_view name) {
     }
 }
 
+void TrickManager::EndTricks() {
+    ThrowReturn();
+    InPlaceRotationReturn();
+}
+
+void TrickManager::PauseTricks() {
+    auto* rigidBody = _saberTrickModel->Rigidbody;
+    
+    static auto* get_velocity_Injected = (function_ptr_t<void, Il2CppObject*, Vector3*>)CRASH_UNLESS(
+        il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::get_velocity_Injected"));
+    get_velocity_Injected(rigidBody, &pauseVelo);
+    static auto* get_angularVelocity_Injected = (function_ptr_t<void, Il2CppObject*, Vector3*>)CRASH_UNLESS(
+        il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::get_angularVelocity_Injected"));
+    get_angularVelocity_Injected(rigidBody, &pauseAngVelo);
+
+    // CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidBody, "isKinematic", true));
+    static auto* Sleep = (function_ptr_t<void, Il2CppObject*>)CRASH_UNLESS(
+        il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::Sleep"));
+    Sleep(rigidBody);
+}
+
+void TrickManager::ResumeTricks() {
+    auto* rigidBody = _saberTrickModel->Rigidbody;
+    
+    // CRASH_UNLESS(il2cpp_utils::RunMethod(rigidBody, "isKinematic", false));
+    CRASH_UNLESS(il2cpp_utils::RunMethod(rigidBody, "WakeUp"));
+    CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidBody, "velocity", pauseVelo));
+    CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidBody, "angularVelocity", pauseAngVelo));
+    CRASH_UNLESS(il2cpp_utils::RunMethod(rigidBody, "AddTorque", torqWorld, 5));
+}
+
 void TrickManager::ThrowStart() {
     if (_throwState == Inactive) {
         logger().debug("%s throw start!", _isLeftSaber ? "Left" : "Right");
@@ -605,7 +636,7 @@ void TrickManager::ThrowStart() {
         logger().debug("velocity: %f", Vector3_Magnitude(velo));
         logger().debug("_saberRotSpeed: %f", _saberRotSpeed);
         auto torqRel = Vector3_Multiply(Vector3_Right, _saberRotSpeed);
-        auto torqWorld = CRASH_UNLESS(il2cpp_utils::RunMethod<Vector3>(saberTransform, "TransformVector", torqRel));
+        torqWorld = CRASH_UNLESS(il2cpp_utils::RunMethod<Vector3>(saberTransform, "TransformVector", torqRel));
         // 5 == ForceMode.Acceleration
         CRASH_UNLESS(il2cpp_utils::RunMethod(rigidBody, "AddTorque", torqWorld, 5));
 
@@ -669,6 +700,7 @@ void TrickManager::ThrowReturn() {
 void TrickManager::ThrowEnd() {
     logger().debug("%s throw end!", _isLeftSaber ? "Left" : "Right");
     CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "isKinematic", true));  // restore
+    torqWorld = Vector3_Zero;
     if (!PluginConfig::Instance().EnableTrickCutting) {
         _saberTrickModel->ChangeToActualSaber();
     } else {

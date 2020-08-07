@@ -58,6 +58,8 @@ class TrickManager {
 		TrickManager* other = nullptr;
 		void Start();
 		void EndTricks();
+		void PauseTricks();
+    	void ResumeTricks();
 		static void Clear();
 		static void FixedUpdate();
         void Update();
@@ -112,4 +114,8 @@ class TrickManager {
 		Vector3 _throwReturnDirection = Vector3_Zero;
 		// float _prevThrowReturnDistance;
 		Il2CppObject* _fakeTransform;  // will "replace" VRController's transform during trickCutting throws
+		// pause data
+		Vector3 pauseVelo;
+		Vector3 pauseAngVelo;
+		Vector3 torqWorld;
 };

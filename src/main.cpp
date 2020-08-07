@@ -51,15 +51,26 @@ MAKE_HOOK_OFFSETLESS(Saber_ManualUpdate, void, Il2CppObject* self) {
     }
 }
 
+MAKE_HOOK_OFFSETLESS(OVRInput_Update, void, Il2CppObject* self) {
+    logger().debug("OVRInput_Update!");
+    OVRInput_Update(self);
+}
+
 MAKE_HOOK_OFFSETLESS(FixedUpdate, void, Il2CppObject* self) {
     FixedUpdate(self);
     TrickManager::FixedUpdate();
 }
 
+MAKE_HOOK_OFFSETLESS(Pause, void, Il2CppObject* self) {
+    leftSaber.PauseTricks();
+    rightSaber.PauseTricks();
+    Pause(self);
+}
+
 MAKE_HOOK_OFFSETLESS(Resume, void, Il2CppObject* self) {
     Resume(self);
-    leftSaber.EndTricks();
-    rightSaber.EndTricks();
+    leftSaber.ResumeTricks();
+    rightSaber.ResumeTricks();
 }
 
 extern "C" void load() {
@@ -70,9 +81,9 @@ extern "C" void load() {
     INSTALL_HOOK_OFFSETLESS(Saber_Start, il2cpp_utils::FindMethod("", "Saber", "Start"));
 
     INSTALL_HOOK_OFFSETLESS(FixedUpdate, il2cpp_utils::FindMethod("", "OculusVRHelper", "FixedUpdate"));
-    // TODO: find a good LateUpdate?
     // INSTALL_HOOK_OFFSETLESS(LateUpdate, il2cpp_utils::FindMethod("", "VRPlatformHelper", "LateUpdate"));
 
+    INSTALL_HOOK_OFFSETLESS(Pause, il2cpp_utils::FindMethod("", "GamePause", "Pause"));
     INSTALL_HOOK_OFFSETLESS(Resume, il2cpp_utils::FindMethod("", "GamePause", "Resume"));
     logger().info("Installed all hooks!");
 }

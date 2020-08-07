@@ -28,7 +28,7 @@ include $(PREBUILT_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_MODULE := beatsaber-hook
 LOCAL_EXPORT_C_INCLUDES := extern/beatsaber-hook
-LOCAL_SRC_FILES := extern/libbeatsaber-hook_0_3_5.so
+LOCAL_SRC_FILES := extern/libbeatsaber-hook_0_3_6.so
 include $(PREBUILT_SHARED_LIBRARY)
 # Creating prebuilt for dependency: bs-utils - version: 0.1.3
 include $(CLEAR_VARS)
@@ -47,5 +47,5 @@ LOCAL_SHARED_LIBRARIES += beatsaber-hook
 LOCAL_SHARED_LIBRARIES += bs-utils
 LOCAL_LDLIBS += -llog
 LOCAL_CFLAGS += -I'C:\Unity\2019.3.2f1\Editor\Data\il2cpp\libil2cpp' -isystem 'extern'
-LOCAL_C_INCLUDES += ./include ./src
+LOCAL_C_INCLUDES += ./include
 include $(BUILD_SHARED_LIBRARY)
