@@ -103,7 +103,6 @@ class TrickManager {
 		std::vector<Vector3> _angularVelocityBuffer;
 		float _spinSpeed;
 		float _finalSpinSpeed;
-		float _returnSpeed;
 		SaberTrickModel* _saberTrickModel = nullptr;
 		Quaternion    _prevTrickRot       = Quaternion_Identity;
 		float _timeSinceStart = 0.0f;

@@ -18,6 +18,7 @@ static float _originalTimeScale;
 static float _targetTimeScale;
 static Il2CppObject* _audioSource;
 static function_ptr_t<void, Il2CppObject*> RigidbodySleep;
+static bool _gamePaused = false;
 
 
 static const MethodInfo* VRController_get_transform = nullptr;
@@ -379,6 +380,7 @@ void TrickManager::FixedUpdate() {
 }
 
 void TrickManager::Update() {
+    if (_gamePaused) return;
     if (!_saberTrickModel) {
         _timeSinceStart += getDeltaTime();
         if (PluginConfig::Instance().EnableTrickCutting || il2cpp_utils::RunMethod(_saberT, "Find", _saberName).value_or(nullptr) ||
@@ -425,14 +427,14 @@ void TrickManager::Update() {
         float distance = Vector3_Magnitude(d);
 
         float deltaTime = getDeltaTime();
-        if (distance <= PluginConfig::Instance().ControllerSnapThreshold || _returnSpeed * deltaTime > distance) {
+        if (distance <= PluginConfig::Instance().ControllerSnapThreshold) {
             ThrowEnd();
         } else {
-            _returnSpeed = fmax(distance, 1.0f) * PluginConfig::Instance().ReturnSpeed;
-            logger().debug("distance: %f; return speed: %f", distance, _returnSpeed);
+            float returnSpeed = fmax(distance, 1.0f) * PluginConfig::Instance().ReturnSpeed;
+            logger().debug("distance: %f; return speed: %f", distance, returnSpeed);
             // logger().debug("mag: %f, minMag = %f (vs. %f)", mag, minMag, magToCoverDistanceInOneFrame);
             auto dirNorm = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(d, "normalized"));
-            auto newVel = Vector3_Multiply(dirNorm, _returnSpeed);
+            auto newVel = Vector3_Multiply(dirNorm, returnSpeed);
 
             CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "velocity", newVel));
 
@@ -574,29 +576,13 @@ void TrickManager::EndTricks() {
 }
 
 void TrickManager::PauseTricks() {
-    auto* rigidBody = _saberTrickModel->Rigidbody;
-    
-    static auto* get_velocity_Injected = (function_ptr_t<void, Il2CppObject*, Vector3*>)CRASH_UNLESS(
-        il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::get_velocity_Injected"));
-    get_velocity_Injected(rigidBody, &pauseVelo);
-    static auto* get_angularVelocity_Injected = (function_ptr_t<void, Il2CppObject*, Vector3*>)CRASH_UNLESS(
-        il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::get_angularVelocity_Injected"));
-    get_angularVelocity_Injected(rigidBody, &pauseAngVelo);
-
-    // CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidBody, "isKinematic", true));
-    static auto* Sleep = (function_ptr_t<void, Il2CppObject*>)CRASH_UNLESS(
-        il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::Sleep"));
-    Sleep(rigidBody);
+    _gamePaused = true;
+    CRASH_UNLESS(il2cpp_utils::RunMethod(_saberTrickModel->SaberGO, "SetActive", false));
 }
 
 void TrickManager::ResumeTricks() {
-    auto* rigidBody = _saberTrickModel->Rigidbody;
-    
-    // CRASH_UNLESS(il2cpp_utils::RunMethod(rigidBody, "isKinematic", false));
-    CRASH_UNLESS(il2cpp_utils::RunMethod(rigidBody, "WakeUp"));
-    CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidBody, "velocity", pauseVelo));
-    CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidBody, "angularVelocity", pauseAngVelo));
-    CRASH_UNLESS(il2cpp_utils::RunMethod(rigidBody, "AddTorque", torqWorld, 5));
+    _gamePaused = false;
+    CRASH_UNLESS(il2cpp_utils::RunMethod(_saberTrickModel->SaberGO, "SetActive", true));
 }
 
 void TrickManager::ThrowStart() {
@@ -685,7 +671,6 @@ void TrickManager::ThrowReturn() {
         Vector3 saberPos = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(_saberTrickModel->Rigidbody, "position"));
         _throwReturnDirection = Vector3_Subtract(_controllerPosition, saberPos);
         logger().debug("distance: %f", Vector3_Magnitude(_throwReturnDirection));
-        _returnSpeed = 0;
 
         if ((_slowmoState == Started) && (other->_throwState != Started)) {
             _slowmoTimeScale = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<float>(AudioTimeSyncController, "timeScale"));

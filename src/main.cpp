@@ -62,15 +62,15 @@ MAKE_HOOK_OFFSETLESS(FixedUpdate, void, Il2CppObject* self) {
 }
 
 MAKE_HOOK_OFFSETLESS(Pause, void, Il2CppObject* self) {
+    Pause(self);
     leftSaber.PauseTricks();
     rightSaber.PauseTricks();
-    Pause(self);
 }
 
 MAKE_HOOK_OFFSETLESS(Resume, void, Il2CppObject* self) {
-    Resume(self);
     leftSaber.ResumeTricks();
     rightSaber.ResumeTricks();
+    Resume(self);
 }
 
 extern "C" void load() {
