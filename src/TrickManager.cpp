@@ -423,20 +423,16 @@ void TrickManager::Update() {
     if (_throwState == Ending) {
         auto& d = _throwReturnDirection;
         float distance = Vector3_Magnitude(d);
-        logger().debug("distance: %f", distance);
 
-        if (distance <= PluginConfig::Instance().ControllerSnapThreshold) {
+        float deltaTime = getDeltaTime();
+        if (distance <= PluginConfig::Instance().ControllerSnapThreshold || _returnSpeed * deltaTime > distance) {
             ThrowEnd();
         } else {
-            float speed = PluginConfig::Instance().ReturnSpeed;
-            float force = (distance < 1.0f) ? speed: speed * distance;
-            // float magToCoverDistanceInOneFrame = distance / getDeltaTime();
-            // float minForce = fmin(speed, magToCoverDistanceInOneFrame);
-            force = std::clamp(force, 0.0f, 200.0f);
+            _returnSpeed = fmax(distance, 1.0f) * PluginConfig::Instance().ReturnSpeed;
+            logger().debug("distance: %f; return speed: %f", distance, _returnSpeed);
             // logger().debug("mag: %f, minMag = %f (vs. %f)", mag, minMag, magToCoverDistanceInOneFrame);
-            auto normalized = CRASH_UNLESS(il2cpp_utils::FindProperty("UnityEngine", "Vector3", "normalized"));
-            auto dirNorm = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(&d, normalized));
-            auto newVel = Vector3_Multiply(dirNorm, force);
+            auto dirNorm = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(d, "normalized"));
+            auto newVel = Vector3_Multiply(dirNorm, _returnSpeed);
 
             CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "velocity", newVel));
 
@@ -682,11 +678,14 @@ void TrickManager::ThrowUpdate() {
 void TrickManager::ThrowReturn() {
     if (_throwState == Started) {
         logger().debug("%s throw return!", _isLeftSaber ? "Left" : "Right");
+
         CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "velocity", Vector3_Zero));
         _throwState = Ending;
 
         Vector3 saberPos = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(_saberTrickModel->Rigidbody, "position"));
         _throwReturnDirection = Vector3_Subtract(_controllerPosition, saberPos);
+        logger().debug("distance: %f", Vector3_Magnitude(_throwReturnDirection));
+        _returnSpeed = 0;
 
         if ((_slowmoState == Started) && (other->_throwState != Started)) {
             _slowmoTimeScale = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<float>(AudioTimeSyncController, "timeScale"));
