@@ -359,6 +359,7 @@ void ForceEndSlowmo() {
 }
 
 void TrickManager::FixedUpdate() {
+    if (_gamePaused) return;
     if (_slowmoState == Started) {
         // IEnumerator ApplySlowmoSmooth
         if (_slowmoTimeScale > _targetTimeScale) {
