@@ -16,16 +16,18 @@ extern "C" void setup(ModInfo& info)
     logger().info("Leaving setup!");
 }
 
+Il2CppObject* FakeSaber = nullptr;
 TrickManager leftSaber;
 TrickManager rightSaber;
 
 MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self) {
+    FakeSaber = nullptr;
     TrickManager::Clear();
     PluginConfig::Instance().Reload();  // TODO: this only needs to be called once on song start, not once for each saber
     Saber_Start(self);
     int saberType = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(self, "saberType"));
     logger().debug("SaberType: %i", saberType);
-    if(saberType == 0){
+    if (saberType == 0) {
         logger().debug("Left?");
         leftSaber.VRController = CRASH_UNLESS(il2cpp_utils::GetFieldValue(self, "_vrController"));
         leftSaber.Saber = self;
@@ -51,6 +53,39 @@ MAKE_HOOK_OFFSETLESS(Saber_ManualUpdate, void, Il2CppObject* self) {
     }
 }
 
+static std::vector<Il2CppReflectionType*> tBurnTypes;
+void DisableBurnMarks(int saberType) {
+    if (!FakeSaber) {
+        static auto* tSaber = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "Saber"));
+        auto* core = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "GameObject", "Find", il2cpp_utils::createcsstr("GameCore")));
+        FakeSaber = CRASH_UNLESS(il2cpp_utils::RunMethod(core, "AddComponent", tSaber));
+        CRASH_UNLESS(il2cpp_utils::SetPropertyValue(FakeSaber, "enabled", false));
+        logger().info("FakeSaber.isActiveAndEnabled: %i",
+            CRASH_UNLESS(il2cpp_utils::GetPropertyValue<bool>(FakeSaber, "isActiveAndEnabled")));
+    }
+    for (auto* type : tBurnTypes) {
+        auto* components = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(
+            "UnityEngine", "Object", "FindObjectsOfType", type));
+        for (int i = 0; i < components->Length(); i++) {
+            auto* sabers = CRASH_UNLESS(il2cpp_utils::GetFieldValue<Array<Il2CppObject*>*>(components->values[i], "_sabers"));
+            sabers->values[saberType] = FakeSaber;
+        }
+    }
+}
+
+void EnableBurnMarks(int saberType) {
+    for (auto* type : tBurnTypes) {
+        auto* components = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(
+            "UnityEngine", "Object", "FindObjectsOfType", type));
+        for (int i = 0; i < components->Length(); i++) {
+            auto* playerController = CRASH_UNLESS(il2cpp_utils::GetFieldValue(components->values[i], "_playerController"));
+            auto* sabers = CRASH_UNLESS(il2cpp_utils::GetFieldValue<Array<Il2CppObject*>*>(components->values[i], "_sabers"));
+            sabers->values[saberType] = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(playerController,
+                saberType ? "rightSaber" : "leftSaber"));;
+        }
+    }
+}
+
 MAKE_HOOK_OFFSETLESS(OVRInput_Update, void, Il2CppObject* self) {
     logger().debug("OVRInput_Update!");
     OVRInput_Update(self);
@@ -61,7 +96,26 @@ MAKE_HOOK_OFFSETLESS(FixedUpdate, void, Il2CppObject* self) {
     TrickManager::FixedUpdate();
 }
 
+void PrintList(std::string_view ns, std::string_view className) {
+    Il2CppReflectionType* type = CRASH_UNLESS(il2cpp_utils::GetSystemType(ns, className));
+    auto* components = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(
+        "UnityEngine", "Object", "FindObjectsOfType", type));
+    for (int i = 0; i < components->Length(); i++) {
+        auto* go = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(components->values[i], "gameObject"));
+        while (go != nullptr) {
+            auto* str = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(go, "name"));
+            logger().info("%s::%s idx %i: %s", ns.data(), className.data(), i, to_utf8(csstrtostr(str)).data());
+            auto* goT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(go, "transform"));
+            auto* parentT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(goT, "parent"));
+            go = parentT ? CRASH_UNLESS(il2cpp_utils::GetPropertyValue(parentT, "gameObject")) : nullptr;
+        }
+    }
+}
+
 MAKE_HOOK_OFFSETLESS(Pause, void, Il2CppObject* self) {
+    PrintList("", "SaberBurnMarkArea");
+    PrintList("", "SaberBurnMarkSparkles");
+    PrintList("", "ObstacleSaberSparkleEffectManager");
     Pause(self);
     leftSaber.PauseTricks();
     rightSaber.PauseTricks();
@@ -71,6 +125,12 @@ MAKE_HOOK_OFFSETLESS(Resume, void, Il2CppObject* self) {
     leftSaber.ResumeTricks();
     rightSaber.ResumeTricks();
     Resume(self);
+}
+
+MAKE_HOOK_OFFSETLESS(SaberBurnMarkSparkles_LateUpdate, void, Il2CppObject* self) {
+    SaberBurnMarkSparkles_LateUpdate(self);
+    auto* prevBurnMarkPosValid = CRASH_UNLESS(il2cpp_utils::GetFieldValue<Array<bool>*>(self, "_prevBurnMarkPosValid"));
+    prevBurnMarkPosValid->values[0] = false;
 }
 
 extern "C" void load() {
@@ -85,5 +145,10 @@ extern "C" void load() {
 
     INSTALL_HOOK_OFFSETLESS(Pause, il2cpp_utils::FindMethod("", "GamePause", "Pause"));
     INSTALL_HOOK_OFFSETLESS(Resume, il2cpp_utils::FindMethod("", "GamePause", "Resume"));
+
+    tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberBurnMarkArea")));
+    tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberBurnMarkSparkles")));
+    tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "ObstacleSaberSparkleEffectManager")));
+    // INSTALL_HOOK_OFFSETLESS(SaberBurnMarkSparkles_LateUpdate, il2cpp_utils::FindMethod("", "SaberBurnMarkSparkles", "LateUpdate"));
     logger().info("Installed all hooks!");
 }

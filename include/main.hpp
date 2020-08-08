@@ -8,4 +8,7 @@
 static ModInfo modInfo;
 const Logger& logger();
 
+void DisableBurnMarks(int saberType);
+void EnableBurnMarks(int saberType);
+
 extern "C" void load();

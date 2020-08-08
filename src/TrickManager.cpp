@@ -18,7 +18,7 @@ static float _originalTimeScale;
 static float _targetTimeScale;
 static Il2CppObject* _audioSource;
 static function_ptr_t<void, Il2CppObject*> RigidbodySleep;
-static bool _gamePaused = false;
+static bool _gamePaused;
 
 
 static const MethodInfo* VRController_get_transform = nullptr;
@@ -283,6 +283,7 @@ void TrickManager::Clear() {
     AudioTimeSyncController = nullptr;
     SaberClashChecker = nullptr;
     _audioSource = nullptr;
+    _gamePaused = false;
 }
 
 void TrickManager::Start() {
@@ -380,7 +381,6 @@ void TrickManager::FixedUpdate() {
 }
 
 void TrickManager::Update() {
-    if (_gamePaused) return;
     if (!_saberTrickModel) {
         _timeSinceStart += getDeltaTime();
         if (PluginConfig::Instance().EnableTrickCutting || il2cpp_utils::RunMethod(_saberT, "Find", _saberName).value_or(nullptr) ||
@@ -390,6 +390,7 @@ void TrickManager::Update() {
             return;
         }
     }
+    if (_gamePaused) return;
     // RET_V_UNLESS(il2cpp_utils::GetPropertyValue<bool>(VRController, "enabled").value_or(false));
 
     std::optional<Quaternion> oRot;
@@ -577,12 +578,14 @@ void TrickManager::EndTricks() {
 
 void TrickManager::PauseTricks() {
     _gamePaused = true;
-    CRASH_UNLESS(il2cpp_utils::RunMethod(_saberTrickModel->SaberGO, "SetActive", false));
+    if (_saberTrickModel)
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_saberTrickModel->SaberGO, "SetActive", false));
 }
 
 void TrickManager::ResumeTricks() {
     _gamePaused = false;
-    CRASH_UNLESS(il2cpp_utils::RunMethod(_saberTrickModel->SaberGO, "SetActive", true));
+    if (_saberTrickModel)
+        CRASH_UNLESS(il2cpp_utils::RunMethod(_saberTrickModel->SaberGO, "SetActive", true));
 }
 
 void TrickManager::ThrowStart() {
@@ -629,6 +632,8 @@ void TrickManager::ThrowStart() {
                 VRController_transform_is_hooked = true;
             }
         }
+
+        DisableBurnMarks(_isLeftSaber ? 0 : 1);
 
         _throwState = Started;
 
@@ -694,6 +699,7 @@ void TrickManager::ThrowEnd() {
     if (other->_throwState == Inactive) {
         ForceEndSlowmo();
     }
+    EnableBurnMarks(_isLeftSaber ? 0 : 1);
     _throwState = Inactive;
     TrickEnd();
 }
