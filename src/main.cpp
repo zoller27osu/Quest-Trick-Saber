@@ -96,26 +96,7 @@ MAKE_HOOK_OFFSETLESS(FixedUpdate, void, Il2CppObject* self) {
     TrickManager::FixedUpdate();
 }
 
-void PrintList(std::string_view ns, std::string_view className) {
-    Il2CppReflectionType* type = CRASH_UNLESS(il2cpp_utils::GetSystemType(ns, className));
-    auto* components = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(
-        "UnityEngine", "Object", "FindObjectsOfType", type));
-    for (int i = 0; i < components->Length(); i++) {
-        auto* go = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(components->values[i], "gameObject"));
-        while (go != nullptr) {
-            auto* str = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(go, "name"));
-            logger().info("%s::%s idx %i: %s", ns.data(), className.data(), i, to_utf8(csstrtostr(str)).data());
-            auto* goT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(go, "transform"));
-            auto* parentT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(goT, "parent"));
-            go = parentT ? CRASH_UNLESS(il2cpp_utils::GetPropertyValue(parentT, "gameObject")) : nullptr;
-        }
-    }
-}
-
 MAKE_HOOK_OFFSETLESS(Pause, void, Il2CppObject* self) {
-    PrintList("", "SaberBurnMarkArea");
-    PrintList("", "SaberBurnMarkSparkles");
-    PrintList("", "ObstacleSaberSparkleEffectManager");
     Pause(self);
     leftSaber.PauseTricks();
     rightSaber.PauseTricks();
@@ -127,12 +108,6 @@ MAKE_HOOK_OFFSETLESS(Resume, void, Il2CppObject* self) {
     Resume(self);
 }
 
-MAKE_HOOK_OFFSETLESS(SaberBurnMarkSparkles_LateUpdate, void, Il2CppObject* self) {
-    SaberBurnMarkSparkles_LateUpdate(self);
-    auto* prevBurnMarkPosValid = CRASH_UNLESS(il2cpp_utils::GetFieldValue<Array<bool>*>(self, "_prevBurnMarkPosValid"));
-    prevBurnMarkPosValid->values[0] = false;
-}
-
 extern "C" void load() {
     PluginConfig::Init();
     // TODO: config menus
@@ -141,7 +116,7 @@ extern "C" void load() {
     INSTALL_HOOK_OFFSETLESS(Saber_Start, il2cpp_utils::FindMethod("", "Saber", "Start"));
 
     INSTALL_HOOK_OFFSETLESS(FixedUpdate, il2cpp_utils::FindMethod("", "OculusVRHelper", "FixedUpdate"));
-    // INSTALL_HOOK_OFFSETLESS(LateUpdate, il2cpp_utils::FindMethod("", "VRPlatformHelper", "LateUpdate"));
+    // INSTALL_HOOK_OFFSETLESS(LateUpdate, il2cpp_utils::FindMethod("", "SaberBurnMarkSparkles", "LateUpdate"));
 
     INSTALL_HOOK_OFFSETLESS(Pause, il2cpp_utils::FindMethod("", "GamePause", "Pause"));
     INSTALL_HOOK_OFFSETLESS(Resume, il2cpp_utils::FindMethod("", "GamePause", "Resume"));
@@ -149,6 +124,5 @@ extern "C" void load() {
     tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberBurnMarkArea")));
     tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberBurnMarkSparkles")));
     tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "ObstacleSaberSparkleEffectManager")));
-    // INSTALL_HOOK_OFFSETLESS(SaberBurnMarkSparkles_LateUpdate, il2cpp_utils::FindMethod("", "SaberBurnMarkSparkles", "LateUpdate"));
     logger().info("Installed all hooks!");
 }
