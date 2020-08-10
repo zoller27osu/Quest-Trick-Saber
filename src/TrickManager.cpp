@@ -277,19 +277,24 @@ void TrickManager::Start2() {
     _originalSaberModelT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(saberGO, "transform"));
 }
 
-//static
-void TrickManager::Clear() {
+void TrickManager::StaticClear() {
     _slowmoState = Inactive;
     AudioTimeSyncController = nullptr;
     SaberClashChecker = nullptr;
     _audioSource = nullptr;
     _gamePaused = false;
+    
+    cQuaternion = CRASH_UNLESS(il2cpp_utils::GetClassFromName("UnityEngine", "Quaternion"));
+}
+
+void TrickManager::Clear() {
+    _throwState = Inactive;
+    _spinState = Inactive;
+    _saberTrickModel = nullptr;
+    _originalSaberModelT = nullptr;
 }
 
 void TrickManager::Start() {
-    _throwState = Inactive;
-    _spinState = Inactive;
-
     if (!AudioTimeSyncController) {
         auto* tATSC = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "AudioTimeSyncController"));
         AudioTimeSyncController = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "FindObjectOfType", tATSC));
@@ -305,10 +310,7 @@ void TrickManager::Start() {
         logger().debug("RigidbodySleep ptr offset: %lX", asOffset(RigidbodySleep));
     }
 
-    cQuaternion = CRASH_UNLESS(il2cpp_utils::GetClassFromName("UnityEngine", "Quaternion"));
-
     // auto* rigidbody = CRASH_UNLESS(GetComponent(Saber, "UnityEngine", "Rigidbody"));
-
     _collider = CRASH_UNLESS(GetComponent(Saber, "UnityEngine", "BoxCollider"));
     _vrPlatformHelper = CRASH_UNLESS(il2cpp_utils::GetFieldValue(VRController, "_vrPlatformHelper"));
 
@@ -321,8 +323,6 @@ void TrickManager::Start() {
     _saberT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(Saber, "transform"));
     _saberName = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(Saber, "name"));
     logger().debug("saberName: %s", to_utf8(csstrtostr(_saberName)).c_str());
-    _saberTrickModel = nullptr;
-    _originalSaberModelT = nullptr;
     _basicSaberName = il2cpp_utils::createcsstr("BasicSaberModel(Clone)");
 
     if (PluginConfig::Instance().EnableTrickCutting) {

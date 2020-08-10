@@ -56,11 +56,12 @@ class TrickManager {
         Il2CppObject* Saber;         // ::Saber
         Il2CppObject* VRController;  // ::VRController
 		TrickManager* other = nullptr;
+		void Clear();
 		void Start();
 		void EndTricks();
 		void PauseTricks();
     	void ResumeTricks();
-		static void Clear();
+		static void StaticClear();
 		static void FixedUpdate();
         void Update();
 	

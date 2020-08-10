@@ -20,10 +20,17 @@ Il2CppObject* FakeSaber = nullptr;
 TrickManager leftSaber;
 TrickManager rightSaber;
 
-MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self) {
+MAKE_HOOK_OFFSETLESS(GameScenesManager_PushScenes, void, Il2CppObject* self, Il2CppObject* scenesTransitionSetupData,
+        float minDuration, Il2CppObject* afterMinDurationCallback, Il2CppObject* finishCallback) {
+    GameScenesManager_PushScenes(self, scenesTransitionSetupData, minDuration, afterMinDurationCallback, finishCallback);
     FakeSaber = nullptr;
-    TrickManager::Clear();
-    PluginConfig::Instance().Reload();  // TODO: this only needs to be called once on song start, not once for each saber
+    PluginConfig::Instance().Reload();
+    TrickManager::StaticClear();
+    leftSaber.Clear();
+    rightSaber.Clear();
+}
+
+MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self) {
     Saber_Start(self);
     int saberType = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(self, "saberType"));
     logger().debug("SaberType: %i", saberType);
@@ -112,8 +119,9 @@ extern "C" void load() {
     PluginConfig::Init();
     // TODO: config menus
     logger().info("Installing hooks...");
-    INSTALL_HOOK_OFFSETLESS(Saber_ManualUpdate, il2cpp_utils::FindMethod("", "Saber", "ManualUpdate"));
+    INSTALL_HOOK_OFFSETLESS(GameScenesManager_PushScenes, il2cpp_utils::FindMethodUnsafe("", "GameScenesManager", "PushScenes", 4));
     INSTALL_HOOK_OFFSETLESS(Saber_Start, il2cpp_utils::FindMethod("", "Saber", "Start"));
+    INSTALL_HOOK_OFFSETLESS(Saber_ManualUpdate, il2cpp_utils::FindMethod("", "Saber", "ManualUpdate"));
 
     INSTALL_HOOK_OFFSETLESS(FixedUpdate, il2cpp_utils::FindMethod("", "OculusVRHelper", "FixedUpdate"));
     // INSTALL_HOOK_OFFSETLESS(LateUpdate, il2cpp_utils::FindMethod("", "SaberBurnMarkSparkles", "LateUpdate"));
@@ -124,5 +132,6 @@ extern "C" void load() {
     tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberBurnMarkArea")));
     tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberBurnMarkSparkles")));
     tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "ObstacleSaberSparkleEffectManager")));
+
     logger().info("Installed all hooks!");
 }
