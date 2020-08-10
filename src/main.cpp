@@ -25,6 +25,7 @@ MAKE_HOOK_OFFSETLESS(GameScenesManager_PushScenes, void, Il2CppObject* self, Il2
         float minDuration, Il2CppObject* afterMinDurationCallback, Il2CppObject* finishCallback) {
     GameScenesManager_PushScenes(self, scenesTransitionSetupData, minDuration, afterMinDurationCallback, finishCallback);
     FakeSaber = nullptr;
+    RealSaber = nullptr;
     PluginConfig::Instance().Reload();
     TrickManager::StaticClear();
     leftSaber.Clear();
