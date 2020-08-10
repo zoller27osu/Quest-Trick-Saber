@@ -17,6 +17,7 @@ extern "C" void setup(ModInfo& info)
 }
 
 Il2CppObject* FakeSaber = nullptr;
+Il2CppObject* RealSaber = nullptr;
 TrickManager leftSaber;
 TrickManager rightSaber;
 
@@ -48,6 +49,7 @@ MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self) {
         rightSaber.other = &leftSaber;
         rightSaber.Start();
     }
+    RealSaber = self;
 }
 
 MAKE_HOOK_OFFSETLESS(Saber_ManualUpdate, void, Il2CppObject* self) {
@@ -69,6 +71,10 @@ void DisableBurnMarks(int saberType) {
         CRASH_UNLESS(il2cpp_utils::SetPropertyValue(FakeSaber, "enabled", false));
         logger().info("FakeSaber.isActiveAndEnabled: %i",
             CRASH_UNLESS(il2cpp_utils::GetPropertyValue<bool>(FakeSaber, "isActiveAndEnabled")));
+
+        auto* saberTypeObj = CRASH_UNLESS(il2cpp_utils::GetFieldValue(RealSaber, "_saberType"));
+        CRASH_UNLESS(il2cpp_utils::SetFieldValue(FakeSaber, "_saberType", saberTypeObj));
+        logger().info("FakeSaber SaberType: %i", CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(FakeSaber, "saberType")));
     }
     for (auto* type : tBurnTypes) {
         auto* components = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(
