@@ -2,14 +2,12 @@
 #include "../include/PluginConfig.hpp"
 #include "../include/TrickManager.hpp"
 
-const Logger& logger()
-{
+const Logger& logger() {
     static const Logger& logger(modInfo);
     return logger;
 }
 
-extern "C" void setup(ModInfo& info)
-{
+extern "C" void setup(ModInfo& info) {
     info.id      = "TrickSaber";
     info.version = "0.2.0";
     modInfo      = info;
