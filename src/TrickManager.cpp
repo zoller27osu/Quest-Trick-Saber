@@ -51,7 +51,7 @@ void ButtonMapping::Update() {
 
     // Method missing from libil2cpp.so
     //auto* controllerInputDevice = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine.XR", "InputDevices", "GetDeviceAtXRNode", node));
-    static auto* getDeviceIdAtXRNode = (function_ptr_t<uint64_t, XRNode>)CRASH_UNLESS(
+    static auto getDeviceIdAtXRNode = (function_ptr_t<uint64_t, XRNode>)CRASH_UNLESS(
         il2cpp_functions::resolve_icall("UnityEngine.XR.InputTracking::GetDeviceIdAtXRNode"));
     logger().debug("getDeviceIdAtXRNode ptr offset: %lX", asOffset(getDeviceIdAtXRNode));
     auto deviceId = getDeviceIdAtXRNode(node);

@@ -43,17 +43,17 @@ class SaberTrickModel {
         CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidbody, "useGravity", false));
         CRASH_UNLESS(il2cpp_utils::SetPropertyValue(rigidbody, "isKinematic", true));
 
-        auto* set_detectCollisions = (function_ptr_t<void, Il2CppObject*, bool>)CRASH_UNLESS(
+        static auto set_detectCollisions = (function_ptr_t<void, Il2CppObject*, bool>)CRASH_UNLESS(
             il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::set_detectCollisions"));
         logger().debug("set_detectCollisions ptr offset: %lX", asOffset(set_detectCollisions));
         set_detectCollisions(rigidbody, false);
 
-        auto* set_maxAngVel = (function_ptr_t<void, Il2CppObject*, float>)CRASH_UNLESS(
+        static auto set_maxAngVel = (function_ptr_t<void, Il2CppObject*, float>)CRASH_UNLESS(
             il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::set_maxAngularVelocity"));
         logger().debug("set_maxAngVel ptr offset: %lX", asOffset(set_maxAngVel));
         set_maxAngVel(rigidbody, 800.0f);
 
-        auto* set_interp = (function_ptr_t<void, Il2CppObject*, int>)CRASH_UNLESS(
+        static auto set_interp = (function_ptr_t<void, Il2CppObject*, int>)CRASH_UNLESS(
             il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::set_interpolation"));
         logger().debug("set_interpolation ptr offset: %lX", asOffset(set_interp));
         set_interp(rigidbody, 1);  // Interpolate
