@@ -51,9 +51,10 @@ void ButtonMapping::Update() {
 
     // Method missing from libil2cpp.so
     //auto* controllerInputDevice = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine.XR", "InputDevices", "GetDeviceAtXRNode", node));
-    static auto* getDeviceIdAtXRNode = CRASH_UNLESS(il2cpp_functions::resolve_icall("UnityEngine.XR.InputTracking::GetDeviceIdAtXRNode"));
+    static auto* getDeviceIdAtXRNode = (function_ptr_t<uint64_t, XRNode>)CRASH_UNLESS(
+        il2cpp_functions::resolve_icall("UnityEngine.XR.InputTracking::GetDeviceIdAtXRNode"));
     logger().debug("getDeviceIdAtXRNode ptr offset: %lX", asOffset(getDeviceIdAtXRNode));
-    auto deviceId = ((function_ptr_t<uint64_t, XRNode>)(getDeviceIdAtXRNode))(node);
+    auto deviceId = getDeviceIdAtXRNode(node);
     auto* controllerInputDevice = CRASH_UNLESS(il2cpp_utils::New("UnityEngine.XR", "InputDevice", deviceId));
 
     logger().debug("oculusController: %i", (int)oculusController);
