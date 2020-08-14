@@ -109,7 +109,9 @@ MAKE_HOOK_OFFSETLESS(OVRInput_Update, void, Il2CppObject* self) {
 
 MAKE_HOOK_OFFSETLESS(FixedUpdate, void, Il2CppObject* self) {
     FixedUpdate(self);
-    TrickManager::FixedUpdate();
+    TrickManager::StaticFixedUpdate();
+    leftSaber.FixedUpdate();
+    rightSaber.FixedUpdate();
 }
 
 MAKE_HOOK_OFFSETLESS(Pause, void, Il2CppObject* self) {

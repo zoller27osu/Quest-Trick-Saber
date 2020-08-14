@@ -31,7 +31,7 @@ struct ButtonMapping {
 		bool left;
 		// static ButtonMapping LeftButtons;
 		// static ButtonMapping RightButtons;
-		std::unordered_map<TrickAction, std::unordered_set<InputHandler*>> actionHandlers;
+		std::unordered_map<TrickAction, std::unordered_set<std::unique_ptr<InputHandler>>> actionHandlers;
 
 		void Update();
 
@@ -56,13 +56,14 @@ class TrickManager {
         Il2CppObject* Saber;         // ::Saber
         Il2CppObject* VRController;  // ::VRController
 		TrickManager* other = nullptr;
+		static void StaticClear();
 		void Clear();
 		void Start();
 		void EndTricks();
 		void PauseTricks();
     	void ResumeTricks();
-		static void StaticClear();
-		static void FixedUpdate();
+		static void StaticFixedUpdate();
+		void FixedUpdate();
         void Update();
 	
 	protected:

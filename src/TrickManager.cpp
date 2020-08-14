@@ -64,15 +64,16 @@ void ButtonMapping::Update() {
 
     auto dir = PluginConfig::Instance().ThumbstickDirection;
 
-    InputHandler* triggerHandler = new TriggerHandler(node, PluginConfig::Instance().TriggerThreshold);
-    InputHandler* gripHandler = new GripHandler(vrSystem, oculusController, controllerInputDevice,
-        PluginConfig::Instance().GripThreshold);
-    InputHandler* thumbstickHandler = new ThumbstickHandler(node, PluginConfig::Instance().ThumbstickThreshold, dir);
-
     actionHandlers.clear();
-    actionHandlers[PluginConfig::Instance().TriggerAction].insert(triggerHandler);
-    actionHandlers[PluginConfig::Instance().GripAction].insert(gripHandler);
-    actionHandlers[PluginConfig::Instance().ThumbstickAction].insert(thumbstickHandler);
+    actionHandlers[PluginConfig::Instance().TriggerAction].insert(std::unique_ptr<InputHandler>(
+        new TriggerHandler(node, PluginConfig::Instance().TriggerThreshold)
+    ));
+    actionHandlers[PluginConfig::Instance().GripAction].insert(std::unique_ptr<InputHandler>(
+        new GripHandler(vrSystem, oculusController, controllerInputDevice, PluginConfig::Instance().GripThreshold)
+    ));
+    actionHandlers[PluginConfig::Instance().ThumbstickAction].insert(std::unique_ptr<InputHandler>(
+        new ThumbstickHandler(node, PluginConfig::Instance().ThumbstickThreshold, dir)
+    ));
     if (actionHandlers[TrickAction::Throw].empty()) {
         logger().warning("No inputs assigned to Throw! Throw will never trigger!");
     }
@@ -237,7 +238,9 @@ void TrickManager::Start2() {
             // Find the old trail script
             static auto* tTrail = CRASH_UNLESS(il2cpp_utils::GetSystemType("Xft", "XWeaponTrail"));
             auto* trailComponent = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "GetComponent", tTrail));
-            if (trailComponent) {
+            if (!trailComponent) {
+                logger().info("trailComponent not found!");
+            } else {
                 // Create a new trail script on the custom saber
                 auto* saberGO = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(saberModelT, "gameObject"));
                 auto* newTrail = CRASH_UNLESS(il2cpp_utils::RunMethod(saberGO, "AddComponent", tTrail));
@@ -361,7 +364,7 @@ void ForceEndSlowmo() {
     }
 }
 
-void TrickManager::FixedUpdate() {
+void TrickManager::StaticFixedUpdate() {
     if (_gamePaused) return;
     if (_slowmoState == Started) {
         // IEnumerator ApplySlowmoSmooth
@@ -380,6 +383,26 @@ void TrickManager::FixedUpdate() {
         } else if (_slowmoTimeScale != _targetTimeScale) {
             _slowmoTimeScale = _targetTimeScale;
             SetTimescale(_slowmoTimeScale);
+        }
+    }
+}
+
+void TrickManager::FixedUpdate() {
+    if (!_saberTrickModel) return;
+    if (_throwState == Ending) {
+        Vector3 saberPos = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(_saberTrickModel->Rigidbody, "position"));
+        auto d = Vector3_Subtract(_controllerPosition, saberPos);
+        float distance = Vector3_Magnitude(d);
+
+        if (distance <= PluginConfig::Instance().ControllerSnapThreshold) {
+            ThrowEnd();
+        } else {
+            float returnSpeed = fmax(distance, 1.0f) * PluginConfig::Instance().ReturnSpeed;
+            logger().debug("distance: %f; return speed: %f", distance, returnSpeed);
+            auto dirNorm = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(d, "normalized"));
+            auto newVel = Vector3_Multiply(dirNorm, returnSpeed);
+
+            CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "velocity", newVel));
         }
     }
 }
@@ -427,26 +450,6 @@ void TrickManager::Update() {
     _prevRot = _controllerRotation;
 
     // TODO: move these to LateUpdate?
-    if (_throwState == Ending) {
-        auto& d = _throwReturnDirection;
-        float distance = Vector3_Magnitude(d);
-
-        float deltaTime = getDeltaTime();
-        if (distance <= PluginConfig::Instance().ControllerSnapThreshold) {
-            ThrowEnd();
-        } else {
-            float returnSpeed = fmax(distance, 1.0f) * PluginConfig::Instance().ReturnSpeed;
-            logger().debug("distance: %f; return speed: %f", distance, returnSpeed);
-            // logger().debug("mag: %f, minMag = %f (vs. %f)", mag, minMag, magToCoverDistanceInOneFrame);
-            auto dirNorm = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(d, "normalized"));
-            auto newVel = Vector3_Multiply(dirNorm, returnSpeed);
-
-            CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "velocity", newVel));
-
-            Vector3 saberPos = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(_saberTrickModel->Rigidbody, "position"));
-            _throwReturnDirection = Vector3_Subtract(_controllerPosition, saberPos);
-        }
-    }
     if (_spinState == Ending) {
         auto rot = CRASH_UNLESS(oRot);
         auto targetRot = PluginConfig::Instance().EnableTrickCutting ? _controllerRotation: Quaternion_Identity;
@@ -495,12 +498,12 @@ ValueTuple TrickManager::GetTrackingPos() {
     return result;
 }
 
-bool CheckHandlersDown(decltype(ButtonMapping::actionHandlers)::mapped_type handlers, float& power) {
+bool CheckHandlersDown(decltype(ButtonMapping::actionHandlers)::mapped_type& handlers, float& power) {
     power = 0;
     // logger().debug("handlers.size(): %lu", handlers.size());
     CRASH_UNLESS(handlers.size() > 0);
     if (handlers.size() == 0) return false;
-    for (auto* handler : handlers) {
+    for (auto& handler : handlers) {
         float val;
         if (!handler->Activated(val)) {
             return false;
@@ -511,8 +514,8 @@ bool CheckHandlersDown(decltype(ButtonMapping::actionHandlers)::mapped_type hand
     return true; 
 }
 
-bool CheckHandlersUp(decltype(ButtonMapping::actionHandlers)::mapped_type handlers) {
-    for (auto* handler : handlers) {
+bool CheckHandlersUp(decltype(ButtonMapping::actionHandlers)::mapped_type& handlers) {
+    for (auto& handler : handlers) {
         if (handler->Deactivated()) return true;
     }
     return false;

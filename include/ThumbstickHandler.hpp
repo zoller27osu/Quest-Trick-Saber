@@ -26,6 +26,6 @@ class ThumbstickHandler : public InputHandler {
     }
 
     ~ThumbstickHandler() {
-        il2cpp_functions::free(_inputString);
+        free(_inputString);
     }
 };

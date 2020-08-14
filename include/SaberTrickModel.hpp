@@ -69,7 +69,7 @@ class SaberTrickModel {
 
     void FixBasicTrickSaber(Il2CppObject* newSaber, bool basic) {
         if (!basic) return;
-        logger().debug("Fixing basic trick saber!");
+        logger().debug("Fixing basic trick saber color!");
 
         static auto* tSaberModelContainer = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberModelContainer"));
         auto* saberModelContainer = CRASH_UNLESS(il2cpp_utils::RunMethod(SaberGO, "GetComponentInParent", tSaberModelContainer));

@@ -10,9 +10,8 @@ class TriggerHandler : public InputHandler {
 
   public:
     TriggerHandler(XRNode node, float threshold) : InputHandler(threshold) {
-        auto* str = (node == XRNode::LeftHand) ? "TriggerLeftHand" : "TriggerRightHand";
+        auto str = (node == XRNode::LeftHand) ? "TriggerLeftHand" : "TriggerRightHand";
         _inputString = il2cpp_utils::createcsstr(str, true);
-
         IsReversed = PluginConfig::Instance().ReverseTrigger;
     }
 
@@ -24,6 +23,6 @@ class TriggerHandler : public InputHandler {
     }
 
     ~TriggerHandler() {
-        il2cpp_functions::free(_inputString);
+        free(_inputString);
     }
 };
