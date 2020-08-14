@@ -14,7 +14,7 @@ class ThumbstickHandler : public InputHandler {
     ThumbstickHandler(XRNode node, float threshold, ThumbstickDir thumstickDir) : InputHandler(threshold) {
         std::string axis = thumstickDir == ThumbstickDir::Horizontal ? "Horizontal" : "Vertical";
         axis += node == XRNode::LeftHand ? "LeftHand" : "RightHand";
-        _inputString = il2cpp_utils::createcsstr(axis);
+        _inputString = il2cpp_utils::createcsstr(axis, true);
         IsReversed = PluginConfig::Instance().ReverseThumbstick;
     }
 
@@ -23,5 +23,9 @@ class ThumbstickHandler : public InputHandler {
         auto val = CRASH_UNLESS(il2cpp_utils::RunMethod<float>(klass, "GetAxis", _inputString));
         // if (val != 0) logger().debug("ThumbstickHandler input value: %f", val);
         return val;
+    }
+
+    ~ThumbstickHandler() {
+        il2cpp_functions::free(_inputString);
     }
 };
