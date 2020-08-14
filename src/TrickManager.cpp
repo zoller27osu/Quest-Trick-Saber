@@ -218,6 +218,7 @@ Vector3 TrickManager::GetAverageAngularVelocity() {
 }
 
 void TrickManager::Start2() {
+    logger().debug("TrickManager.Start2!");
     Il2CppObject* saberModelT;
     Il2CppObject* basicSaberT = nullptr;
     if (!PluginConfig::Instance().EnableTrickCutting) {
@@ -345,6 +346,7 @@ void TrickManager::Start() {
 
         // TODO: instead of patching this transform onto the VRController, add a clone VRController component to the object?
     }
+    logger().debug("Leaving TrickManager.Start");
 }
 
 void SetTimescale(float timescale) {

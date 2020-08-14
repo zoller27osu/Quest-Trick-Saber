@@ -21,6 +21,7 @@ TrickManager rightSaber;
 
 MAKE_HOOK_OFFSETLESS(GameScenesManager_PushScenes, void, Il2CppObject* self, Il2CppObject* scenesTransitionSetupData,
         float minDuration, Il2CppObject* afterMinDurationCallback, Il2CppObject* finishCallback) {
+    logger().debug("GameScenesManager_PushScenes");
     GameScenesManager_PushScenes(self, scenesTransitionSetupData, minDuration, afterMinDurationCallback, finishCallback);
     FakeSaber = nullptr;
     RealSaber = nullptr;
@@ -28,10 +29,13 @@ MAKE_HOOK_OFFSETLESS(GameScenesManager_PushScenes, void, Il2CppObject* self, Il2
     TrickManager::StaticClear();
     leftSaber.Clear();
     rightSaber.Clear();
+    logger().debug("Leaving GameScenesManager_PushScenes");
 }
 
 MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self) {
+    logger().debug("Saber_Start");
     Saber_Start(self);
+    logger().debug("Saber_Start original called");
     int saberType = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(self, "saberType"));
     logger().debug("SaberType: %i", saberType);
     if (saberType == 0) {

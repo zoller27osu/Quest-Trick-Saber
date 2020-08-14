@@ -12,6 +12,7 @@ class SaberTrickModel {
 
     SaberTrickModel(Il2CppObject* SaberModel, bool basicSaber) {
         CRASH_UNLESS(SaberModel);
+        logger().debug("SaberTrickModel construction!");
         tRigidbody = CRASH_UNLESS(il2cpp_utils::GetSystemType("UnityEngine", "Rigidbody"));
         // il2cpp_utils::LogClass(il2cpp_functions::class_from_system_type(tRigidbody), false);
 
@@ -37,6 +38,7 @@ class SaberTrickModel {
             CRASH_UNLESS(il2cpp_utils::RunMethod(trickModelT, "SetParent", vrGameCoreT));
             CRASH_UNLESS(il2cpp_utils::RunMethod(TrickModel, "SetActive", false));
         }
+        logger().debug("Leaving SaberTrickModel construction!");
     }
 
     void SetupRigidbody(Il2CppObject* rigidbody, Il2CppObject* model) {
@@ -67,6 +69,7 @@ class SaberTrickModel {
 
     void FixBasicTrickSaber(Il2CppObject* newSaber, bool basic) {
         if (!basic) return;
+        logger().debug("Fixing basic trick saber!");
 
         static auto* tSaberModelContainer = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberModelContainer"));
         auto* saberModelContainer = CRASH_UNLESS(il2cpp_utils::RunMethod(SaberGO, "GetComponentInParent", tSaberModelContainer));
