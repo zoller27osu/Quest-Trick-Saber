@@ -353,8 +353,10 @@ void TrickManager::Start() {
 }
 
 void SetTimescale(float timescale) {
-    CRASH_UNLESS(il2cpp_utils::SetFieldValue(AudioTimeSyncController, "_timeScale", timescale));
-    CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_audioSource, "pitch", timescale));
+    // Efficiency is top priority in FixedUpdate!
+    if (AudioTimeSyncController) CRASH_UNLESS(il2cpp_utils::SetFieldValue(AudioTimeSyncController, "_timeScale", timescale));
+    static const MethodInfo* setPitch = CRASH_UNLESS(il2cpp_utils::FindMethodUnsafe("UnityEngine", "AudioSource", "SetPitch", 2));
+    if (_audioSource) CRASH_UNLESS(il2cpp_utils::RunMethod(nullptr, setPitch, _audioSource, timescale));
 }
 
 void ForceEndSlowmo() {
@@ -365,6 +367,7 @@ void ForceEndSlowmo() {
 }
 
 void TrickManager::StaticFixedUpdate() {
+    // Efficiency is top priority in FixedUpdate!
     if (_gamePaused) return;
     if (_slowmoState == Started) {
         // IEnumerator ApplySlowmoSmooth
@@ -388,23 +391,8 @@ void TrickManager::StaticFixedUpdate() {
 }
 
 void TrickManager::FixedUpdate() {
+    // Efficiency is top priority in FixedUpdate!
     if (!_saberTrickModel) return;
-    if (_throwState == Ending) {
-        Vector3 saberPos = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(_saberTrickModel->Rigidbody, "position"));
-        auto d = Vector3_Subtract(_controllerPosition, saberPos);
-        float distance = Vector3_Magnitude(d);
-
-        if (distance <= PluginConfig::Instance().ControllerSnapThreshold) {
-            ThrowEnd();
-        } else {
-            float returnSpeed = fmax(distance, 1.0f) * PluginConfig::Instance().ReturnSpeed;
-            logger().debug("distance: %f; return speed: %f", distance, returnSpeed);
-            auto dirNorm = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(d, "normalized"));
-            auto newVel = Vector3_Multiply(dirNorm, returnSpeed);
-
-            CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "velocity", newVel));
-        }
-    }
 }
 
 void TrickManager::Update() {
@@ -450,6 +438,22 @@ void TrickManager::Update() {
     _prevRot = _controllerRotation;
 
     // TODO: move these to LateUpdate?
+    if (_throwState == Ending) {
+        Vector3 saberPos = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(_saberTrickModel->Rigidbody, "position"));
+        auto d = Vector3_Subtract(_controllerPosition, saberPos);
+        float distance = Vector3_Magnitude(d);
+
+        if (distance <= PluginConfig::Instance().ControllerSnapThreshold) {
+            ThrowEnd();
+        } else {
+            float returnSpeed = fmax(distance, 1.0f) * PluginConfig::Instance().ReturnSpeed;
+            logger().debug("distance: %f; return speed: %f", distance, returnSpeed);
+            auto dirNorm = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(d, "normalized"));
+            auto newVel = Vector3_Multiply(dirNorm, returnSpeed);
+
+            CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "velocity", newVel));
+        }
+    }
     if (_spinState == Ending) {
         auto rot = CRASH_UNLESS(oRot);
         auto targetRot = PluginConfig::Instance().EnableTrickCutting ? _controllerRotation: Quaternion_Identity;
@@ -644,16 +648,18 @@ void TrickManager::ThrowStart() {
 
         _throwState = Started;
 
-        if (PluginConfig::Instance().SlowmoDuringThrow && _slowmoState != Started) {
-            // ApplySlowmoSmooth
-            logger().debug("Starting slowmo");
+        if (PluginConfig::Instance().SlowmoDuringThrow) {
             _audioSource = CRASH_UNLESS(il2cpp_utils::GetFieldValue(AudioTimeSyncController, "_audioSource"));
-            _slowmoTimeScale = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<float>(AudioTimeSyncController, "timeScale"));
-            _originalTimeScale = (_slowmoState == Inactive) ? _slowmoTimeScale : _targetTimeScale;
+            if (_slowmoState != Started) {
+                // ApplySlowmoSmooth
+                logger().debug("Starting slowmo");
+                _slowmoTimeScale = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<float>(AudioTimeSyncController, "timeScale"));
+                _originalTimeScale = (_slowmoState == Inactive) ? _slowmoTimeScale : _targetTimeScale;
 
-            _targetTimeScale = _originalTimeScale - PluginConfig::Instance().SlowmoAmount;
-            if (_targetTimeScale < 0.1f) _targetTimeScale = 0.1f;
-            _slowmoState = Started;
+                _targetTimeScale = _originalTimeScale - PluginConfig::Instance().SlowmoAmount;
+                if (_targetTimeScale < 0.1f) _targetTimeScale = 0.1f;
+                _slowmoState = Started;
+            }
         }
     } else {
         logger().debug("%s throw continues", _isLeftSaber ? "Left" : "Right");

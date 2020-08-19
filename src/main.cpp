@@ -19,16 +19,25 @@ Il2CppObject* RealSaber = nullptr;
 TrickManager leftSaber;
 TrickManager rightSaber;
 
+MAKE_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, void, Scene scene, int mode) {
+    if (auto nameOpt = il2cpp_utils::GetPropertyValue<Il2CppString*>(scene, "name")) {
+        auto* name = *nameOpt;
+        auto str = to_utf8(csstrtostr(name));
+        logger().debug("Scene name internal: %s", str.c_str());
+    }
+    FakeSaber = nullptr;
+    RealSaber = nullptr;
+    TrickManager::StaticClear();
+    leftSaber.Clear();
+    rightSaber.Clear();
+    SceneManager_Internal_SceneLoaded(scene, mode);
+}
+
 MAKE_HOOK_OFFSETLESS(GameScenesManager_PushScenes, void, Il2CppObject* self, Il2CppObject* scenesTransitionSetupData,
         float minDuration, Il2CppObject* afterMinDurationCallback, Il2CppObject* finishCallback) {
     logger().debug("GameScenesManager_PushScenes");
     GameScenesManager_PushScenes(self, scenesTransitionSetupData, minDuration, afterMinDurationCallback, finishCallback);
-    FakeSaber = nullptr;
-    RealSaber = nullptr;
     PluginConfig::Instance().Reload();
-    TrickManager::StaticClear();
-    leftSaber.Clear();
-    rightSaber.Clear();
     logger().debug("Leaving GameScenesManager_PushScenes");
 }
 
@@ -110,8 +119,6 @@ MAKE_HOOK_OFFSETLESS(OVRInput_Update, void, Il2CppObject* self) {
 MAKE_HOOK_OFFSETLESS(FixedUpdate, void, Il2CppObject* self) {
     FixedUpdate(self);
     TrickManager::StaticFixedUpdate();
-    leftSaber.FixedUpdate();
-    rightSaber.FixedUpdate();
 }
 
 MAKE_HOOK_OFFSETLESS(Pause, void, Il2CppObject* self) {
@@ -130,6 +137,7 @@ extern "C" void load() {
     PluginConfig::Init();
     // TODO: config menus
     logger().info("Installing hooks...");
+    INSTALL_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, il2cpp_utils::FindMethodUnsafe("UnityEngine.SceneManagement", "SceneManager", "Internal_SceneLoaded", 2));
     INSTALL_HOOK_OFFSETLESS(GameScenesManager_PushScenes, il2cpp_utils::FindMethodUnsafe("", "GameScenesManager", "PushScenes", 4));
     INSTALL_HOOK_OFFSETLESS(Saber_Start, il2cpp_utils::FindMethod("", "Saber", "Start"));
     INSTALL_HOOK_OFFSETLESS(Saber_ManualUpdate, il2cpp_utils::FindMethod("", "Saber", "ManualUpdate"));

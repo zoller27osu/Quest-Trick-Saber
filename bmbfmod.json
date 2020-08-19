@@ -1,12 +1,12 @@
 {
-    "id": "tricksaber",
-    "name": "TrickSaber",
-    "author": "ToniMacaroni",
+    "id": "TrickSaber",
+    "name": "Trick Saber",
+    "author": "zoller27osu",
     "description": [
-        "Ported by zoller27osu. See https://tonimacaroni.github.io/TrickSaber-Docs/Configuration for config explanations."
+        "A port of the PC Trick Saber mod. See https://tonimacaroni.github.io/TrickSaber-Docs/Configuration for config explanations."
     ],
     "category": "Gameplay",
-    "gameVersion": "1.9.1",
+    "gameVersion": "1.10.0",
     "version": "0.2.0",
     "platform": "Quest",
     "components": [
@@ -17,6 +17,21 @@
             },
             "uninstallAction": {
                 "removeLibraryFile": "libtricksaber.so"
+            }
+        },
+        {
+            "type": "HookModLibrary",
+            "installAction": {
+                "installLibraryFile": "libbeatsaber-hook_0_4_4.so"
+            }
+        },
+        {
+            "type": "HookMod",
+            "installAction": {
+                "installLibraryFile": "libbs-utils_0_2_4.so"
+            },
+            "uninstallAction": {
+                "removeLibraryFile": "libbs-utils_0_2_4.so"
             }
         }
     ]

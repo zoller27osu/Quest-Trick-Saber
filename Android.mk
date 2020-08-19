@@ -24,17 +24,17 @@ LOCAL_MODULE := modloader
 LOCAL_EXPORT_C_INCLUDES := extern/modloader
 LOCAL_SRC_FILES := extern/libmodloader.so
 include $(PREBUILT_SHARED_LIBRARY)
-# Creating prebuilt for dependency: beatsaber-hook - version: 0.3.6
+# Creating prebuilt for dependency: beatsaber-hook - version: 0.4.4
 include $(CLEAR_VARS)
 LOCAL_MODULE := beatsaber-hook
 LOCAL_EXPORT_C_INCLUDES := extern/beatsaber-hook
-LOCAL_SRC_FILES := extern/libbeatsaber-hook_0_3_6.so
+LOCAL_SRC_FILES := extern/libbeatsaber-hook_0_4_4.so
 include $(PREBUILT_SHARED_LIBRARY)
-# Creating prebuilt for dependency: bs-utils - version: 0.2.0
+# Creating prebuilt for dependency: bs-utils - version: 0.2.4
 include $(CLEAR_VARS)
 LOCAL_MODULE := bs-utils
 LOCAL_EXPORT_C_INCLUDES := extern/bs-utils
-LOCAL_SRC_FILES := extern/libbs-utils_0_2_0.so
+LOCAL_SRC_FILES := extern/libbs-utils_0_2_4.so
 include $(PREBUILT_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
