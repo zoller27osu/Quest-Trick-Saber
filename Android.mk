@@ -26,13 +26,13 @@ LOCAL_SRC_FILES := extern/libmodloader.so
 include $(PREBUILT_SHARED_LIBRARY)
 # Creating prebuilt for dependency: beatsaber-hook - version: 0.4.4
 include $(CLEAR_VARS)
-LOCAL_MODULE := beatsaber-hook
+LOCAL_MODULE := beatsaber-hook_0_4_4
 LOCAL_EXPORT_C_INCLUDES := extern/beatsaber-hook
 LOCAL_SRC_FILES := extern/libbeatsaber-hook_0_4_4.so
 include $(PREBUILT_SHARED_LIBRARY)
 # Creating prebuilt for dependency: bs-utils - version: 0.2.4
 include $(CLEAR_VARS)
-LOCAL_MODULE := bs-utils
+LOCAL_MODULE := bs-utils_0_2_4
 LOCAL_EXPORT_C_INCLUDES := extern/bs-utils
 LOCAL_SRC_FILES := extern/libbs-utils_0_2_4.so
 include $(PREBUILT_SHARED_LIBRARY)
@@ -43,8 +43,8 @@ LOCAL_SRC_FILES += $(call rwildcard,src/,*.cpp)
 LOCAL_SRC_FILES += $(call rwildcard,extern/beatsaber-hook/src/inline-hook/,*.cpp)
 LOCAL_SRC_FILES += $(call rwildcard,extern/beatsaber-hook/src/inline-hook/,*.c)
 LOCAL_SHARED_LIBRARIES += modloader
-LOCAL_SHARED_LIBRARIES += beatsaber-hook
-LOCAL_SHARED_LIBRARIES += bs-utils
+LOCAL_SHARED_LIBRARIES += beatsaber-hook_0_4_4
+LOCAL_SHARED_LIBRARIES += bs-utils_0_2_4
 LOCAL_LDLIBS += -llog
 LOCAL_CFLAGS += -I'C:\Unity\2019.3.2f1\Editor\Data\il2cpp\libil2cpp' -isystem 'extern'
 LOCAL_C_INCLUDES += ./include

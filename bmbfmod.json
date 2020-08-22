@@ -3,10 +3,11 @@
     "name": "Trick Saber",
     "author": "zoller27osu",
     "description": [
-        "A port of the PC Trick Saber mod. See https://tonimacaroni.github.io/TrickSaber-Docs/Configuration for config explanations."
+        "A port of the PC original mod by Toni Macaroni.",
+        "See https://tonimacaroni.github.io/TrickSaber-Docs/Configuration for config explanations."
     ],
     "category": "Gameplay",
-    "gameVersion": "1.10.0",
+    "gameVersion": "1.11.1",
     "version": "0.2.0",
     "platform": "Quest",
     "components": [
@@ -29,9 +30,6 @@
             "type": "HookMod",
             "installAction": {
                 "installLibraryFile": "libbs-utils_0_2_4.so"
-            },
-            "uninstallAction": {
-                "removeLibraryFile": "libbs-utils_0_2_4.so"
             }
         }
     ]

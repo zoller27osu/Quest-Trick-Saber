@@ -59,6 +59,13 @@ class SaberTrickModel {
             il2cpp_functions::resolve_icall("UnityEngine.Rigidbody::set_interpolation"));
         logger().debug("set_interpolation ptr offset: %lX", asOffset(set_interp));
         set_interp(rigidbody, 1);  // Interpolate
+
+        auto* tCollider = CRASH_UNLESS(il2cpp_utils::GetSystemType("UnityEngine", "Collider"));
+        auto* colliders = CRASH_UNLESS(
+            il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(model, "GetComponentsInChildren", tCollider, true));
+        for (size_t i = 0; i < colliders->Length(); i++) {
+            CRASH_UNLESS(il2cpp_utils::SetPropertyValue(colliders->values[i], "enabled", false));
+        }
     }
 
     void AddTrickRigidbody() {
