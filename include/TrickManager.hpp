@@ -40,12 +40,6 @@ struct ButtonMapping {
 			left = isLeft;
 			Update();
         };
-	private:
-		// OVRInput.Button
-		Button Trigger;
-		Button Grip;
-        Button ThumbF;  // forward
-        Button ThumbB;  // backward
 };
 
 
@@ -90,7 +84,6 @@ class TrickManager {
 		Vector3 GetAverageAngularVelocity();
         Il2CppObject* _vrPlatformHelper;  			// ::VRPlatformHelper
         ButtonMapping _buttonMapping;
-        Il2CppObject* _rigidBody = nullptr;         // Rigidbody
         Il2CppObject* _collider = nullptr;    		// BoxCollider
         Vector3       _controllerPosition = Vector3_Zero;
         Quaternion    _controllerRotation = Quaternion_Identity;
@@ -100,13 +93,12 @@ class TrickManager {
         float         _currentRotation;
         float         _saberSpeed         = 0.0f;
         float         _saberRotSpeed      = 0.0f;
-		int _currentProbeIndex;
+		size_t _currentProbeIndex;
 		std::vector<Vector3> _velocityBuffer;
 		std::vector<Vector3> _angularVelocityBuffer;
 		float _spinSpeed;
 		float _finalSpinSpeed;
 		SaberTrickModel* _saberTrickModel = nullptr;
-		Quaternion    _prevTrickRot       = Quaternion_Identity;
 		float _timeSinceStart = 0.0f;
 		Il2CppObject* _originalSaberModelT = nullptr;
 		Il2CppString* _saberName = nullptr;
@@ -116,8 +108,4 @@ class TrickManager {
 		Vector3 _throwReturnDirection = Vector3_Zero;
 		// float _prevThrowReturnDistance;
 		Il2CppObject* _fakeTransform;  // will "replace" VRController's transform during trickCutting throws
-		// pause data
-		Vector3 pauseVelo;
-		Vector3 pauseAngVelo;
-		Vector3 torqWorld;
 };

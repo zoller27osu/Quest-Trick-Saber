@@ -46,6 +46,6 @@ LOCAL_SHARED_LIBRARIES += modloader
 LOCAL_SHARED_LIBRARIES += beatsaber-hook_0_4_4
 LOCAL_SHARED_LIBRARIES += bs-utils_0_2_4
 LOCAL_LDLIBS += -llog
-LOCAL_CFLAGS += -I'C:\Unity\2019.3.2f1\Editor\Data\il2cpp\libil2cpp' -isystem 'extern'
+LOCAL_CFLAGS += -isystem 'C:\Unity\2019.3.2f1\Editor\Data\il2cpp\libil2cpp' -isystem 'extern' -Wall -Wextra
 LOCAL_C_INCLUDES += ./include
 include $(BUILD_SHARED_LIBRARY)

@@ -6,7 +6,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "extern/beatsaber-hook/shared/config/config-utils.hpp"
+#include "beatsaber-hook/shared/config/config-utils.hpp"
 
 
 class PluginConfig {

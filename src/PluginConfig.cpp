@@ -1,7 +1,7 @@
 #include "../include/main.hpp"
 #include "../include/PluginConfig.hpp"
-#include "extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
-#include "extern/bs-utils/shared/utils.hpp"
+#include "beatsaber-hook/shared/utils/il2cpp-utils.hpp"
+#include "bs-utils/shared/utils.hpp"
 
 const PluginConfig::ConfigDefaultsMap PluginConfig::configDefaults = InitializeConfigDefaults();
 const PluginConfig::EnumValuesMap PluginConfig::enumValues = GetEnumValuesMap();

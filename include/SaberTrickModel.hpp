@@ -97,14 +97,14 @@ class SaberTrickModel {
 
         auto* glows = CRASH_UNLESS(il2cpp_utils::GetFieldValue<Il2CppArray*>(saberModelController, "_setSaberGlowColors"));
         logger().info("_setSaberGlowColors.length: %u", il2cpp_functions::array_length(glows));
-        for (int i = 0; i < il2cpp_functions::array_length(glows); i++) {
+        for (il2cpp_array_size_t i = 0; i < il2cpp_functions::array_length(glows); i++) {
             auto* obj = il2cpp_array_get(glows, Il2CppObject*, i);
             CRASH_UNLESS(il2cpp_utils::SetFieldValue(obj, "_colorManager", colorMgr));
         }
 
         auto* fakeGlows = CRASH_UNLESS(il2cpp_utils::GetFieldValue<Il2CppArray*>(saberModelController, "_setSaberFakeGlowColors"));
         logger().info("_setSaberFakeGlowColors.length: %u", il2cpp_functions::array_length(fakeGlows));
-        for (int i = 0; i < il2cpp_functions::array_length(fakeGlows); i++) {
+        for (il2cpp_array_size_t i = 0; i < il2cpp_functions::array_length(fakeGlows); i++) {
             auto* obj = il2cpp_array_get(fakeGlows, Il2CppObject*, i);
             CRASH_UNLESS(il2cpp_utils::SetFieldValue(obj, "_colorManager", colorMgr));
         }

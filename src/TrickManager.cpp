@@ -210,7 +210,7 @@ void TrickManager::AddProbe(const Vector3& vel, const Vector3& ang) {
 
 Vector3 TrickManager::GetAverageVelocity() {
     Vector3 avg = Vector3_Zero;
-    for (int i = 0; i < _velocityBuffer.size(); i++) {
+    for (size_t i = 0; i < _velocityBuffer.size(); i++) {
         avg = Vector3_Add(avg, _velocityBuffer[i]);
     }
     return Vector3_Divide(avg, _velocityBuffer.size());
@@ -218,7 +218,7 @@ Vector3 TrickManager::GetAverageVelocity() {
 
 Vector3 TrickManager::GetAverageAngularVelocity() {
     Vector3 avg = Vector3_Zero;
-    for (int i = 0; i < _velocityBuffer.size(); i++) {
+    for (size_t i = 0; i < _velocityBuffer.size(); i++) {
         avg = Vector3_Add(avg, _angularVelocityBuffer[i]);
     }
     return Vector3_Divide(avg, _velocityBuffer.size());
@@ -436,7 +436,7 @@ void TrickManager::Update() {
     auto velocity = Vector3_Divide(dPos, getDeltaTime());
     _angularVelocity = GetAngularVelocity(_prevRot, _controllerRotation);
 
-    float mag = Vector3_Magnitude(_angularVelocity);
+    // float mag = Vector3_Magnitude(_angularVelocity);
     // if (mag) logger().debug("angularVelocity.x: %f, .y: %f, mag: %f", _angularVelocity.x, _angularVelocity.y, mag);
     AddProbe(velocity, _angularVelocity);
     _saberSpeed = Vector3_Magnitude(velocity);
@@ -638,7 +638,7 @@ void TrickManager::ThrowStart() {
         logger().debug("velocity: %f", Vector3_Magnitude(velo));
         logger().debug("_saberRotSpeed: %f", _saberRotSpeed);
         auto torqRel = Vector3_Multiply(Vector3_Right, _saberRotSpeed);
-        torqWorld = CRASH_UNLESS(il2cpp_utils::RunMethod<Vector3>(saberTransform, "TransformVector", torqRel));
+        auto torqWorld = CRASH_UNLESS(il2cpp_utils::RunMethod<Vector3>(saberTransform, "TransformVector", torqRel));
         // 5 == ForceMode.Acceleration
         CRASH_UNLESS(il2cpp_utils::RunMethod(rigidBody, "AddTorque", torqWorld, 5));
 
@@ -708,7 +708,6 @@ void TrickManager::ThrowReturn() {
 void TrickManager::ThrowEnd() {
     logger().debug("%s throw end!", _isLeftSaber ? "Left" : "Right");
     CRASH_UNLESS(il2cpp_utils::SetPropertyValue(_saberTrickModel->Rigidbody, "isKinematic", true));  // restore
-    torqWorld = Vector3_Zero;
     if (!PluginConfig::Instance().EnableTrickCutting) {
         _saberTrickModel->ChangeToActualSaber();
     } else {

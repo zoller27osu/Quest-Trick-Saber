@@ -91,7 +91,7 @@ void DisableBurnMarks(int saberType) {
     for (auto* type : tBurnTypes) {
         auto* components = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(
             "UnityEngine", "Object", "FindObjectsOfType", type));
-        for (int i = 0; i < components->Length(); i++) {
+        for (il2cpp_array_size_t i = 0; i < components->Length(); i++) {
             auto* sabers = CRASH_UNLESS(il2cpp_utils::GetFieldValue<Array<Il2CppObject*>*>(components->values[i], "_sabers"));
             sabers->values[saberType] = FakeSaber;
         }
@@ -102,7 +102,7 @@ void EnableBurnMarks(int saberType) {
     for (auto* type : tBurnTypes) {
         auto* components = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(
             "UnityEngine", "Object", "FindObjectsOfType", type));
-        for (int i = 0; i < components->Length(); i++) {
+        for (il2cpp_array_size_t i = 0; i < components->Length(); i++) {
             auto* playerController = CRASH_UNLESS(il2cpp_utils::GetFieldValue(components->values[i], "_playerController"));
             auto* sabers = CRASH_UNLESS(il2cpp_utils::GetFieldValue<Array<Il2CppObject*>*>(components->values[i], "_sabers"));
             sabers->values[saberType] = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(playerController,

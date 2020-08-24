@@ -2,8 +2,8 @@
 
 #include <dlfcn.h>
 
-#include "extern/modloader/shared/modloader.hpp"
-#include "extern/beatsaber-hook/shared/utils/logging.hpp"
+#include "modloader/shared/modloader.hpp"
+#include "beatsaber-hook/shared/utils/logging.hpp"
 
 static ModInfo modInfo;
 const Logger& logger();

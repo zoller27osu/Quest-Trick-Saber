@@ -11,7 +11,7 @@ class ButtonHandler : public InputHandler {
 
   public:
     ButtonHandler(Controller oculusController, Button button) 
-      : InputHandler(0.5f), _button(button), _oculusController(oculusController)
+      : InputHandler(0.5f), _oculusController(oculusController), _button(button)
     {
         IsReversed = button == Button::One ? PluginConfig::Instance().ReverseButtonOne
           : PluginConfig::Instance().ReverseButtonTwo;
