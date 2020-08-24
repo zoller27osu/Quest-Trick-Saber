@@ -74,6 +74,12 @@ void ButtonMapping::Update() {
     actionHandlers[PluginConfig::Instance().ThumbstickAction].insert(std::unique_ptr<InputHandler>(
         new ThumbstickHandler(node, PluginConfig::Instance().ThumbstickThreshold, dir)
     ));
+    actionHandlers[PluginConfig::Instance().ButtonOneAction].insert(std::unique_ptr<InputHandler>(
+        new ButtonHandler(oculusController, Button::One)
+    ));
+    actionHandlers[PluginConfig::Instance().ButtonTwoAction].insert(std::unique_ptr<InputHandler>(
+        new ButtonHandler(oculusController, Button::Two)
+    ));
     if (actionHandlers[TrickAction::Throw].empty()) {
         logger().warning("No inputs assigned to Throw! Throw will never trigger!");
     }

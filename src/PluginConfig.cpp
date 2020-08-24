@@ -15,11 +15,15 @@ void PluginConfig::Reload() {
     TriggerAction = (TrickAction)ValidatedEnumMember(doc, "TriggerAction");
     GripAction = (TrickAction)ValidatedEnumMember(doc, "GripAction");
     ThumbstickAction = (TrickAction)ValidatedEnumMember(doc, "ThumbstickAction");
+    ButtonOneAction = (TrickAction)ValidatedEnumMember(doc, "ButtonOneAction");
+    ButtonTwoAction = (TrickAction)ValidatedEnumMember(doc, "ButtonTwoAction");
     ThumbstickDirection = (ThumbstickDir)ValidatedEnumMember(doc, "ThumbstickDirection");
 
     ReverseTrigger = GetOrAddDefault(doc, "ReverseTrigger").GetBool();
     ReverseGrip = GetOrAddDefault(doc, "ReverseGrip").GetBool();
     ReverseThumbstick = GetOrAddDefault(doc, "ReverseThumbstick").GetBool();
+    ReverseButtonOne = GetOrAddDefault(doc, "ReverseButtonOne").GetBool();
+    ReverseButtonTwo = GetOrAddDefault(doc, "ReverseButtonTwo").GetBool();
 
     TriggerThreshold = GetOrAddDefault(doc, "TriggerThreshold").GetFloat();
     GripThreshold = GetOrAddDefault(doc, "GripThreshold").GetFloat();

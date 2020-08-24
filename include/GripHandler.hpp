@@ -15,10 +15,11 @@ class GripHandler : public InputHandler {
     MemFn _valueFunc;
 
     float GetValueSteam() {
+        // this class can't even be found on Quest:
         static auto* commonUsages = CRASH_UNLESS(il2cpp_utils::GetClassFromName("UnityEngine.XR", "CommonUsages"));
         auto* grip = CRASH_UNLESS(il2cpp_utils::GetFieldValue(commonUsages, "grip"));
         float outvar;
-        // argument types arg important for finding the correct match
+        // argument types are important for finding the correct match
         if (CRASH_UNLESS(il2cpp_utils::RunMethod<bool>(_controllerInputDevice, "TryGetFeatureValue", grip, outvar))) {
             return outvar;
         }

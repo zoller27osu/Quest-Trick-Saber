@@ -4,7 +4,7 @@ $PSDefaultParameterValues['*:ErrorAction']='Ignore'
 
 adb shell am force-stop com.beatgames.beatsaber
 
-C:\android\sdk\ndk\21.3.6528147\ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=./Android.mk NDK_APPLICATION_MK=./Application.mk # V=1
+& $PSScriptRoot/build.ps1
 
 adb shell am force-stop com.beatgames.beatsaber
 

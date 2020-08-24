@@ -9,7 +9,7 @@ const Logger& logger() {
 
 extern "C" void setup(ModInfo& info) {
     info.id      = "TrickSaber";
-    info.version = "0.2.0";
+    info.version = "0.2.1";
     modInfo      = info;
     logger().info("Leaving setup!");
 }

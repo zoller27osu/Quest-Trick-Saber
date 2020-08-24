@@ -12,6 +12,7 @@ class ThumbstickHandler : public InputHandler {
 
   public:
     ThumbstickHandler(XRNode node, float threshold, ThumbstickDir thumstickDir) : InputHandler(threshold) {
+        // axis names are from HMLib's VRControllersInputManager
         std::string axis = thumstickDir == ThumbstickDir::Horizontal ? "Horizontal" : "Vertical";
         axis += node == XRNode::LeftHand ? "LeftHand" : "RightHand";
         _inputString = il2cpp_utils::createcsstr(axis, il2cpp_utils::StringType::Manual);

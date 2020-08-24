@@ -18,16 +18,19 @@ class PluginConfig {
 		def.emplace("TriggerAction", "Throw");
 		def.emplace("GripAction", "None");
 		def.emplace("ThumbstickAction", "Spin");
+		def.emplace("ButtonOneAction", "None");
+		def.emplace("ButtonTwoAction", "None");
 		def.emplace("ReverseTrigger", false);
 		def.emplace("ReverseGrip", false);
-		def.emplace("ReverseThumbstick", false);
+		def.emplace("ReverseButtonOne", false);
+		def.emplace("ReverseButtonTwo", false);
 		// todo: add "Both" axis option?
 		def.emplace("ThumbstickDirection", "Horizontal");
 		def.emplace("TriggerThreshold", 0.8f);
 		def.emplace("GripThreshold", 0.8f);
 		def.emplace("ThumbstickThreshold", 0.8f);
-		def.emplace("ControllerSnapThreshold", 0.3f);
 
+		def.emplace("ControllerSnapThreshold", 0.3f);
 		def.emplace("IsSpinVelocityDependent", false);
 		def.emplace("SpinSpeed", 1.0f);
 		def.emplace("SpinDirection", "Backward");
@@ -51,6 +54,8 @@ class PluginConfig {
 		vals["TriggerAction"] = ACTION_NAMES;
 		vals["GripAction"] = ACTION_NAMES;
 		vals["ThumbstickAction"] = ACTION_NAMES;
+		vals["ButtonOneAction"] = ACTION_NAMES;
+		vals["ButtonTwoAction"] = ACTION_NAMES;
 		vals["ThumbstickDirection"] = THUMBSTICK_DIR_NAMES;
 		vals["SpinDirection"] = SPIN_DIR_NAMES;
 		return vals;
@@ -126,9 +131,13 @@ class PluginConfig {
 	TrickAction TriggerAction;
 	TrickAction GripAction;
 	TrickAction ThumbstickAction;
+	TrickAction ButtonOneAction;
+	TrickAction ButtonTwoAction;
 	bool ReverseTrigger;
 	bool ReverseGrip;
 	bool ReverseThumbstick;
+	bool ReverseButtonOne;
+	bool ReverseButtonTwo;
 	ThumbstickDir ThumbstickDirection;
 	float TriggerThreshold;
 	float GripThreshold;
