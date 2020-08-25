@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "extern/beatsaber-hook/shared/utils/typedefs.h"
+#include "beatsaber-hook/shared/utils/typedefs.h"
 #include "AllEnums.hpp"
 #include "InputHandler.hpp"
 #include "SaberTrickModel.hpp"

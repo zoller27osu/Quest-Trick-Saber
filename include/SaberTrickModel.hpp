@@ -1,9 +1,9 @@
 #pragma once
 
 #include "PluginConfig.hpp"
-#include "extern/beatsaber-hook/shared/utils/il2cpp-functions.hpp"
-#include "extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
-#include "extern/beatsaber-hook/shared/utils/utils.h"
+#include "beatsaber-hook/shared/utils/il2cpp-functions.hpp"
+#include "beatsaber-hook/shared/utils/il2cpp-utils.hpp"
+#include "beatsaber-hook/shared/utils/utils.h"
 
 class SaberTrickModel {
   public:

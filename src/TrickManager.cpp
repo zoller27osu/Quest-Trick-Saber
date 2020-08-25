@@ -4,8 +4,8 @@
 #include <queue>
 #include "../include/PluginConfig.hpp"
 #include "../include/AllInputHandlers.hpp"
-#include "extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
-#include "extern/beatsaber-hook/shared/utils/instruction-parsing.hpp"
+#include "beatsaber-hook/shared/utils/il2cpp-utils.hpp"
+#include "beatsaber-hook/shared/utils/instruction-parsing.hpp"
 
 // Define static fields
 constexpr Space RotateSpace = Space::Self;
@@ -360,15 +360,19 @@ void TrickManager::Start() {
 
 void SetTimescale(float timescale) {
     // Efficiency is top priority in FixedUpdate!
-    if (AudioTimeSyncController) CRASH_UNLESS(il2cpp_utils::SetFieldValue(AudioTimeSyncController, "_timeScale", timescale));
-    static const MethodInfo* setPitch = CRASH_UNLESS(il2cpp_utils::FindMethodUnsafe("UnityEngine", "AudioSource", "SetPitch", 2));
-    if (_audioSource) CRASH_UNLESS(il2cpp_utils::RunMethod(nullptr, setPitch, _audioSource, timescale));
+    if (AudioTimeSyncController) {
+        CRASH_UNLESS(il2cpp_utils::SetFieldValue(AudioTimeSyncController, "_timeScale", timescale));
+        if (!CRASH_UNLESS(il2cpp_utils::GetPropertyValue<bool>(AudioTimeSyncController, "isAudioLoaded"))) return;
+        static const MethodInfo* setPitch = CRASH_UNLESS(il2cpp_utils::FindMethodUnsafe("UnityEngine", "AudioSource", "SetPitch", 2));
+        if (_audioSource) CRASH_UNLESS(il2cpp_utils::RunMethod(nullptr, setPitch, _audioSource, timescale));
+    }
 }
 
 void ForceEndSlowmo() {
     if (_slowmoState != Inactive) {
         SetTimescale(_targetTimeScale);
         _slowmoState = Inactive;
+        logger().debug("Slowmo ended. timescale: %f", _targetTimeScale);
     }
 }
 

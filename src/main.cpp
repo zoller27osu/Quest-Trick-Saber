@@ -1,6 +1,7 @@
 #include "../include/main.hpp"
 #include "../include/PluginConfig.hpp"
 #include "../include/TrickManager.hpp"
+#include "beatsaber-hook/shared/utils/il2cpp-functions.hpp"
 
 const Logger& logger() {
     static const Logger& logger(modInfo);
@@ -133,6 +134,11 @@ MAKE_HOOK_OFFSETLESS(Resume, void, Il2CppObject* self) {
     Resume(self);
 }
 
+MAKE_HOOK_OFFSETLESS(UnloadAudioData, bool, Il2CppObject* self) {
+    logger().info("Unloading audio data.");
+    return UnloadAudioData(self);
+}
+
 extern "C" void load() {
     PluginConfig::Init();
     // TODO: config menus
@@ -151,6 +157,9 @@ extern "C" void load() {
     tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberBurnMarkArea")));
     tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "SaberBurnMarkSparkles")));
     tBurnTypes.push_back(CRASH_UNLESS(il2cpp_utils::GetSystemType("", "ObstacleSaberSparkleEffectManager")));
+
+    auto icall = CRASH_UNLESS(il2cpp_functions::resolve_icall("UnityEngine.AudioClip::UnloadAudioData"));
+    INSTALL_HOOK_DIRECT(UnloadAudioData, icall);
 
     logger().info("Installed all hooks!");
 }
