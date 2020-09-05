@@ -123,15 +123,19 @@ MAKE_HOOK_OFFSETLESS(FixedUpdate, void, Il2CppObject* self) {
 }
 
 MAKE_HOOK_OFFSETLESS(Pause, void, Il2CppObject* self) {
-    Pause(self);
     leftSaber.PauseTricks();
     rightSaber.PauseTricks();
+    Pause(self);
+    TrickManager::StaticPause();
+    logger().debug("pause: %i", CRASH_UNLESS(il2cpp_utils::GetFieldValue<bool>(self, "_pause")));
 }
 
 MAKE_HOOK_OFFSETLESS(Resume, void, Il2CppObject* self) {
+    Resume(self);
+    TrickManager::StaticResume();
     leftSaber.ResumeTricks();
     rightSaber.ResumeTricks();
-    Resume(self);
+    logger().debug("pause: %i", CRASH_UNLESS(il2cpp_utils::GetFieldValue<bool>(self, "_pause")));
 }
 
 extern "C" void load() {

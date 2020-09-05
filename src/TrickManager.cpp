@@ -237,7 +237,7 @@ void TrickManager::Start2() {
             logger().warning("Did not find custom saber! Thrown sabers will be BasicSaberModel(Clone)!");
             saberModelT = basicSaberT;
         } else {
-            logger().info("Found '%s'!", to_utf8(csstrtostr(_saberName)).c_str());
+            logger().debug("Found '%s'!", to_utf8(csstrtostr(_saberName)).c_str());
 
             // TODO: remove the rest of this once CustomSabers correctly creates trails and removes/moves the vanilla ones
             // Now transfer the trail from basicSaber to saberModel (the custom saber)
@@ -245,7 +245,7 @@ void TrickManager::Start2() {
             static auto* tTrail = CRASH_UNLESS(il2cpp_utils::GetSystemType("Xft", "XWeaponTrail"));
             auto* trailComponent = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "GetComponent", tTrail));
             if (!trailComponent) {
-                logger().info("trailComponent not found!");
+                logger().warning("trailComponent not found!");
             } else {
                 // Create a new trail script on the custom saber
                 auto* saberGO = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(saberModelT, "gameObject"));
@@ -358,10 +358,22 @@ void TrickManager::Start() {
     logger().debug("Leaving TrickManager.Start");
 }
 
+static float GetTimescale() {
+    return CRASH_UNLESS(il2cpp_utils::GetFieldValue<float>(AudioTimeSyncController, "_timeScale"));
+}
+
 void SetTimescale(float timescale) {
     // Efficiency is top priority in FixedUpdate!
     if (AudioTimeSyncController) {
         CRASH_UNLESS(il2cpp_utils::SetFieldValue(AudioTimeSyncController, "_timeScale", timescale));
+        auto songTime = CRASH_UNLESS(il2cpp_utils::GetFieldValue<float>(AudioTimeSyncController, "_songTime"));
+        CRASH_UNLESS(il2cpp_utils::SetFieldValue(AudioTimeSyncController, "_startSongTime", songTime));
+        auto timeSinceStart = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<float>(AudioTimeSyncController, "timeSinceStart"));
+        auto songTimeOffset = CRASH_UNLESS(il2cpp_utils::GetFieldValue<float>(AudioTimeSyncController, "_songTimeOffset"));
+        CRASH_UNLESS(il2cpp_utils::SetFieldValue(AudioTimeSyncController, "_audioStartTimeOffsetSinceStart",
+            timeSinceStart - (songTime + songTimeOffset)));
+        CRASH_UNLESS(il2cpp_utils::SetFieldValue(AudioTimeSyncController, "_fixingAudioSyncError", false));
+        CRASH_UNLESS(il2cpp_utils::SetFieldValue(AudioTimeSyncController, "_playbackLoopIndex", 0));
         if (!CRASH_UNLESS(il2cpp_utils::GetPropertyValue<bool>(AudioTimeSyncController, "isAudioLoaded"))) return;
         static const MethodInfo* setPitch = CRASH_UNLESS(il2cpp_utils::FindMethodUnsafe("UnityEngine", "AudioSource", "SetPitch", 2));
         if (_audioSource) CRASH_UNLESS(il2cpp_utils::RunMethod(nullptr, setPitch, _audioSource, timescale));
@@ -372,7 +384,7 @@ void ForceEndSlowmo() {
     if (_slowmoState != Inactive) {
         SetTimescale(_targetTimeScale);
         _slowmoState = Inactive;
-        logger().debug("Slowmo ended. timescale: %f", _targetTimeScale);
+        logger().debug("Slowmo ended. TimeScale: %f", _targetTimeScale);
     }
 }
 
@@ -385,6 +397,7 @@ void TrickManager::StaticFixedUpdate() {
             _slowmoTimeScale -= PluginConfig::Instance().SlowmoStepAmount;
             SetTimescale(_slowmoTimeScale);
         } else if (_slowmoTimeScale != _targetTimeScale) {
+            logger().debug("Slowmo == Started; Forcing TimeScale from %f to %f", _slowmoTimeScale, _targetTimeScale);
             _slowmoTimeScale = _targetTimeScale;
             SetTimescale(_slowmoTimeScale);
         }
@@ -394,6 +407,7 @@ void TrickManager::StaticFixedUpdate() {
             _slowmoTimeScale += PluginConfig::Instance().SlowmoStepAmount;
             SetTimescale(_slowmoTimeScale);
         } else if (_slowmoTimeScale != _targetTimeScale) {
+            logger().debug("Slowmo == Ending; Forcing TimeScale from %f to %f", _slowmoTimeScale, _targetTimeScale);
             _slowmoTimeScale = _targetTimeScale;
             SetTimescale(_slowmoTimeScale);
         }
@@ -597,14 +611,40 @@ void TrickManager::EndTricks() {
     InPlaceRotationReturn();
 }
 
-void TrickManager::PauseTricks() {
+static void CheckAndLogAudioSync() {
+    if (CRASH_UNLESS(il2cpp_utils::GetFieldValue<bool>(AudioTimeSyncController, "_fixingAudioSyncError")))
+        logger().warning("AudioTimeSyncController is fixing audio time sync issue!");
+    auto timeSinceStart = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<float>(AudioTimeSyncController, "timeSinceStart"));
+    auto audioStartTimeOffsetSinceStart = CRASH_UNLESS(il2cpp_utils::GetFieldValue<float>(AudioTimeSyncController,
+        "_audioStartTimeOffsetSinceStart"));
+    if (timeSinceStart < audioStartTimeOffsetSinceStart) {
+        logger().warning("timeSinceStart < audioStartTimeOffsetSinceStart! _songTime may progress while paused! %f, %f",
+            timeSinceStart, audioStartTimeOffsetSinceStart);
+    } else {
+        logger().debug("timeSinceStart, audioStartTimeOffsetSinceStart: %f, %f", timeSinceStart, audioStartTimeOffsetSinceStart);
+    }
+    logger().debug("_songTime: %f", CRASH_UNLESS(il2cpp_utils::GetFieldValue<float>(AudioTimeSyncController, "_songTime")));
+}
+
+void TrickManager::StaticPause() {
     _gamePaused = true;
+    logger().debug("Paused with TimeScale %f", _slowmoTimeScale);
+    CheckAndLogAudioSync();
+}
+
+void TrickManager::PauseTricks() {
     if (_saberTrickModel)
         CRASH_UNLESS(il2cpp_utils::RunMethod(_saberTrickModel->SaberGO, "SetActive", false));
 }
 
-void TrickManager::ResumeTricks() {
+void TrickManager::StaticResume() {
     _gamePaused = false;
+    _slowmoTimeScale = GetTimescale();
+    logger().debug("Resumed with TimeScale %f", _slowmoTimeScale);
+    CheckAndLogAudioSync();
+}
+
+void TrickManager::ResumeTricks() {
     if (_saberTrickModel)
         CRASH_UNLESS(il2cpp_utils::RunMethod(_saberTrickModel->SaberGO, "SetActive", true));
 }
@@ -662,12 +702,13 @@ void TrickManager::ThrowStart() {
             _audioSource = CRASH_UNLESS(il2cpp_utils::GetFieldValue(AudioTimeSyncController, "_audioSource"));
             if (_slowmoState != Started) {
                 // ApplySlowmoSmooth
-                logger().debug("Starting slowmo");
-                _slowmoTimeScale = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<float>(AudioTimeSyncController, "timeScale"));
+                _slowmoTimeScale = GetTimescale();
                 _originalTimeScale = (_slowmoState == Inactive) ? _slowmoTimeScale : _targetTimeScale;
 
                 _targetTimeScale = _originalTimeScale - PluginConfig::Instance().SlowmoAmount;
                 if (_targetTimeScale < 0.1f) _targetTimeScale = 0.1f;
+
+                logger().debug("Starting slowmo; TimeScale from %f (%f original) to %f", _slowmoTimeScale, _originalTimeScale, _targetTimeScale);
                 _slowmoState = Started;
             }
         }
@@ -701,9 +742,10 @@ void TrickManager::ThrowReturn() {
         logger().debug("distance: %f", Vector3_Magnitude(_throwReturnDirection));
 
         if ((_slowmoState == Started) && (other->_throwState != Started)) {
-            _slowmoTimeScale = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<float>(AudioTimeSyncController, "timeScale"));
+            _slowmoTimeScale = GetTimescale();
             _targetTimeScale = _originalTimeScale;
             _audioSource = CRASH_UNLESS(il2cpp_utils::GetFieldValue(AudioTimeSyncController, "_audioSource"));
+            logger().debug("Ending slowmo; TimeScale from %f to %f", _slowmoTimeScale, _targetTimeScale);
             _slowmoState = Ending;
         }
     }

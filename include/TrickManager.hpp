@@ -54,7 +54,9 @@ class TrickManager {
 		void Clear();
 		void Start();
 		void EndTricks();
+		static void StaticPause();
 		void PauseTricks();
+		static void StaticResume();
     	void ResumeTricks();
 		static void StaticFixedUpdate();
 		void FixedUpdate();
