@@ -23,13 +23,13 @@
         {
             "type": "HookModLibrary",
             "installAction": {
-                "installLibraryFile": "libbeatsaber-hook_0_5_6.so"
+                "installLibraryFile": "libbeatsaber-hook_0_5_4.so"
             }
         },
         {
             "type": "HookModLibrary",
             "installAction": {
-                "installLibraryFile": "libbs-utils_0_3_4.so"
+                "installLibraryFile": "libbs-utils.so"
             }
         }
     ]

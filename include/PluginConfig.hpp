@@ -22,6 +22,7 @@ class PluginConfig {
 		def.emplace("ButtonTwoAction", "None");
 		def.emplace("ReverseTrigger", false);
 		def.emplace("ReverseGrip", false);
+		def.emplace("ReverseThumbstick", false);
 		def.emplace("ReverseButtonOne", false);
 		def.emplace("ReverseButtonTwo", false);
 		// todo: add "Both" axis option?
@@ -38,8 +39,8 @@ class PluginConfig {
 		def.emplace("ReturnSpeed", 10.0f);
 		def.emplace("EnableTrickCutting", false);
 		def.emplace("SlowmoDuringThrow", false);
-		def.emplace("SlowmoAmount", 0.2f);
 		def.emplace("CompleteRotationMode", false);
+		def.emplace("SlowmoAmount", 0.2f);
 
 		// Advanced settings
 		def.emplace("VelocityBufferSize", 5);
@@ -64,6 +65,7 @@ class PluginConfig {
 
 	static void AddDefault(ConfigDocument& config, std::string_view key) {
 		auto& allocator = config.GetAllocator();
+		CRASH_UNLESS(configDefaults.contains(key.data()));
 		config.AddMember(ConfigValue::StringRefType(key.data()), ConfigValue(configDefaults.at(key.data()), allocator), allocator);
 	}
 
