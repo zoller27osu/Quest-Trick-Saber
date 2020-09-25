@@ -68,6 +68,7 @@ class TrickManager {
 
     private:
 		void Start2();
+		Il2CppObject* FindBasicSaberTransform();
         ValueTuple GetTrackingPos();
         void CheckButtons();
         void ThrowStart();

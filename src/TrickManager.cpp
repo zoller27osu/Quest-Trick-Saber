@@ -224,6 +224,15 @@ Vector3 TrickManager::GetAverageAngularVelocity() {
     return Vector3_Divide(avg, _velocityBuffer.size());
 }
 
+Il2CppObject* TrickManager::FindBasicSaberTransform() {
+    auto* basicSaberT = CRASH_UNLESS(il2cpp_utils::RunMethod(_saberT, "Find", _basicSaberName));
+    if (!basicSaberT) {
+        auto* saberModelT = CRASH_UNLESS(il2cpp_utils::RunMethod(_saberT, "Find", _saberName).value_or(nullptr));
+        basicSaberT = CRASH_UNLESS(il2cpp_utils::RunMethod(saberModelT, "Find", _basicSaberName));
+    }
+    return CRASH_UNLESS(basicSaberT);
+}
+
 void TrickManager::Start2() {
     logger().debug("TrickManager.Start2!");
     Il2CppObject* saberModelT;
@@ -231,7 +240,7 @@ void TrickManager::Start2() {
     if (!PluginConfig::Instance().EnableTrickCutting) {
         // Try to find a custom saber - will have same name as _saberT (LeftSaber or RightSaber) but be a child of it
         saberModelT = il2cpp_utils::RunMethod(_saberT, "Find", _saberName).value_or(nullptr);
-        basicSaberT = CRASH_UNLESS(il2cpp_utils::RunMethod(_saberT, "Find", _basicSaberName));
+        basicSaberT = FindBasicSaberTransform();
 
         if (!saberModelT) {
             logger().warning("Did not find custom saber! Thrown sabers will be BasicSaberModel(Clone)!");
@@ -239,43 +248,9 @@ void TrickManager::Start2() {
         } else {
             logger().debug("Found '%s'!", to_utf8(csstrtostr(_saberName)).c_str());
 
-            // TODO: remove the rest of this once CustomSabers correctly creates trails and removes/moves the vanilla ones
-            // Now transfer the trail from basicSaber to saberModel (the custom saber)
-            // Find the old trail script
-            static auto* tTrail = CRASH_UNLESS(il2cpp_utils::GetSystemType("Xft", "XWeaponTrail"));
-            auto* trailComponent = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "GetComponent", tTrail));
-            if (!trailComponent) {
-                logger().warning("trailComponent not found!");
-            } else {
-                // Create a new trail script on the custom saber
-                auto* saberGO = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(saberModelT, "gameObject"));
-                auto* newTrail = CRASH_UNLESS(il2cpp_utils::RunMethod(saberGO, "AddComponent", tTrail));
-
-                // Relocate the children from the BasicSaberModel(Clone) transfrom to the custom saber transform
-                // Most important children: TrailTop, TrailBottom, PointLight?
-                std::vector<Il2CppObject*> children;
-                int childCount = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(basicSaberT, "childCount"));
-                for (int i = 0; i < childCount; i++) {
-                    auto* childT = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "GetChild", i));
-                    children.push_back(childT);
-                }
-                for (auto* child : children) {
-                    CRASH_UNLESS(il2cpp_utils::RunMethod(child, "SetParent", saberModelT));
-                }
-
-                // Copy the necessary properties/fields over from old to new trail script
-                Color trailColor = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Color>(trailComponent, "color"));
-                CRASH_UNLESS(il2cpp_utils::SetPropertyValue(newTrail, "color", trailColor));
-                auto* pointStart = CRASH_UNLESS(il2cpp_utils::GetFieldValue(trailComponent, "_pointStart"));
-                CRASH_UNLESS(il2cpp_utils::SetFieldValue(newTrail, "_pointStart", pointStart));
-                auto* pointEnd = CRASH_UNLESS(il2cpp_utils::GetFieldValue(trailComponent, "_pointEnd"));
-                CRASH_UNLESS(il2cpp_utils::SetFieldValue(newTrail, "_pointEnd", pointEnd));
-                auto* trailPrefab = CRASH_UNLESS(il2cpp_utils::GetFieldValue(trailComponent, "_trailRendererPrefab"));
-                CRASH_UNLESS(il2cpp_utils::SetFieldValue(newTrail, "_trailRendererPrefab", trailPrefab));
-
-                // Destroy the old trail script
-                CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "Destroy", trailComponent));
-            }
+            // Note: this is also done in Qosmetics, but it wasn't in QuestSaber
+            CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "SetParent", saberModelT));
+            basicSaberT = CRASH_UNLESS(il2cpp_utils::RunMethod(saberModelT, "Find", _basicSaberName));
         }
     } else {
         saberModelT = Saber;
@@ -340,8 +315,8 @@ void TrickManager::Start() {
         if (!VRController_get_transform) {
             VRController_get_transform = CRASH_UNLESS(il2cpp_utils::FindMethod("", "VRController", "get_transform"));
         }
-        auto* basicSaberT = CRASH_UNLESS(il2cpp_utils::RunMethod(_saberT, "Find", _basicSaberName));
-        CRASH_UNLESS(basicSaberT);
+        // TODO: get an example point light gameObject without needing basicSaberT?
+        auto* basicSaberT = FindBasicSaberTransform();
         auto* plName = CRASH_UNLESS(il2cpp_utils::createcsstr("PointLight"));
         auto* pointLight = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "Find", plName));
         CRASH_UNLESS(pointLight);
