@@ -6,6 +6,7 @@
 #include "../include/AllInputHandlers.hpp"
 #include "beatsaber-hook/shared/utils/il2cpp-utils.hpp"
 #include "beatsaber-hook/shared/utils/instruction-parsing.hpp"
+#include "modloader/shared/modloader.hpp"
 
 // Define static fields
 constexpr Space RotateSpace = Space::Self;
@@ -245,12 +246,48 @@ void TrickManager::Start2() {
         if (!saberModelT) {
             logger().warning("Did not find custom saber! Thrown sabers will be BasicSaberModel(Clone)!");
             saberModelT = basicSaberT;
+        } else if (Modloader::getMods().contains("Qosmetics")) {
+            logger().debug("Not moving trail because Qosmetics is installed!");
         } else {
             logger().debug("Found '%s'!", to_utf8(csstrtostr(_saberName)).c_str());
 
-            // Note: this is also done in Qosmetics, but it wasn't in QuestSaber
-            CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "SetParent", saberModelT));
-            basicSaberT = CRASH_UNLESS(il2cpp_utils::RunMethod(saberModelT, "Find", _basicSaberName));
+            // TODO: remove the rest of this once CustomSabers correctly creates trails and removes/moves the vanilla ones
+            // Now transfer the trail from basicSaber to saberModel (the custom saber)
+            // Find the old trail script
+            static auto* tTrail = CRASH_UNLESS(il2cpp_utils::GetSystemType("Xft", "XWeaponTrail"));
+            auto* trailComponent = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "GetComponent", tTrail));
+            if (!trailComponent) {
+                logger().warning("trailComponent not found!");
+            } else {
+                // Create a new trail script on the custom saber
+                auto* saberGO = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(saberModelT, "gameObject"));
+                auto* newTrail = CRASH_UNLESS(il2cpp_utils::RunMethod(saberGO, "AddComponent", tTrail));
+
+                // Relocate the children from the BasicSaberModel(Clone) transfrom to the custom saber transform
+                // Most important children: TrailTop, TrailBottom, PointLight?
+                std::vector<Il2CppObject*> children;
+                int childCount = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(basicSaberT, "childCount"));
+                for (int i = 0; i < childCount; i++) {
+                    auto* childT = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "GetChild", i));
+                    children.push_back(childT);
+                }
+                for (auto* child : children) {
+                    CRASH_UNLESS(il2cpp_utils::RunMethod(child, "SetParent", saberModelT));
+                }
+
+                // Copy the necessary properties/fields over from old to new trail script
+                Color trailColor = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Color>(trailComponent, "color"));
+                CRASH_UNLESS(il2cpp_utils::SetPropertyValue(newTrail, "color", trailColor));
+                auto* pointStart = CRASH_UNLESS(il2cpp_utils::GetFieldValue(trailComponent, "_pointStart"));
+                CRASH_UNLESS(il2cpp_utils::SetFieldValue(newTrail, "_pointStart", pointStart));
+                auto* pointEnd = CRASH_UNLESS(il2cpp_utils::GetFieldValue(trailComponent, "_pointEnd"));
+                CRASH_UNLESS(il2cpp_utils::SetFieldValue(newTrail, "_pointEnd", pointEnd));
+                auto* trailPrefab = CRASH_UNLESS(il2cpp_utils::GetFieldValue(trailComponent, "_trailRendererPrefab"));
+                CRASH_UNLESS(il2cpp_utils::SetFieldValue(newTrail, "_trailRendererPrefab", trailPrefab));
+
+                // Destroy the old trail script
+                CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "Destroy", trailComponent));
+            }
         }
     } else {
         saberModelT = Saber;
@@ -315,12 +352,8 @@ void TrickManager::Start() {
         if (!VRController_get_transform) {
             VRController_get_transform = CRASH_UNLESS(il2cpp_utils::FindMethod("", "VRController", "get_transform"));
         }
-        // TODO: get an example point light gameObject without needing basicSaberT?
-        auto* basicSaberT = FindBasicSaberTransform();
-        auto* plName = CRASH_UNLESS(il2cpp_utils::createcsstr("PointLight"));
-        auto* pointLight = CRASH_UNLESS(il2cpp_utils::RunMethod(basicSaberT, "Find", plName));
-        CRASH_UNLESS(pointLight);
-        auto* fakeTransformGO = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "Instantiate", pointLight));
+        auto* fakeTransformName = CRASH_UNLESS(il2cpp_utils::createcsstr("FakeTrickSaberTransform"));
+        auto* fakeTransformGO = CRASH_UNLESS(il2cpp_utils::New("UnityEngine", "GameObject", fakeTransformName));
         _fakeTransform = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(fakeTransformGO, "transform"));
 
         auto* saberParentT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(_saberT, "parent"));
