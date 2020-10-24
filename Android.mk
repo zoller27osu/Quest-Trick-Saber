@@ -26,9 +26,9 @@ LOCAL_SRC_FILES := extern/libmodloader.so
 include $(PREBUILT_SHARED_LIBRARY)
 # Creating prebuilt for dependency: beatsaber-hook - version: 0.5.4
 include $(CLEAR_VARS)
-LOCAL_MODULE := beatsaber-hook_0_5_4
+LOCAL_MODULE := beatsaber-hook_0_7_7
 LOCAL_EXPORT_C_INCLUDES := extern/beatsaber-hook
-LOCAL_SRC_FILES := extern/libbeatsaber-hook_0_5_4.so
+LOCAL_SRC_FILES := extern/libbeatsaber-hook_0_7_7.so
 include $(PREBUILT_SHARED_LIBRARY)
 # Creating prebuilt for dependency: bs-utils - version: 0.3.4
 include $(CLEAR_VARS)
@@ -43,9 +43,9 @@ LOCAL_SRC_FILES += $(call rwildcard,src/,*.cpp)
 LOCAL_SRC_FILES += $(call rwildcard,extern/beatsaber-hook/src/inline-hook/,*.cpp)
 LOCAL_SRC_FILES += $(call rwildcard,extern/beatsaber-hook/src/inline-hook/,*.c)
 LOCAL_SHARED_LIBRARIES += modloader
-LOCAL_SHARED_LIBRARIES += beatsaber-hook_0_5_4
+LOCAL_SHARED_LIBRARIES += beatsaber-hook_0_7_7
 LOCAL_SHARED_LIBRARIES += bs-utils
 LOCAL_LDLIBS += -llog
-LOCAL_CFLAGS += -isystem 'C:\Unity\2019.3.2f1\Editor\Data\il2cpp\libil2cpp' -isystem 'extern' -Wall -Wextra
+LOCAL_CFLAGS += -isystem 'C:\Unity\2019.3.15f1\Editor\Data\il2cpp\libil2cpp' -isystem 'extern' -Wall -Wextra
 LOCAL_C_INCLUDES += ./include
 include $(BUILD_SHARED_LIBRARY)

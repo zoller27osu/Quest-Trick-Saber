@@ -45,6 +45,7 @@ struct ButtonMapping {
 
 class TrickManager {
     public:
+		static bool disableClashing;
         void LogEverything();
         bool _isLeftSaber = false;
         Il2CppObject* Saber;         // ::Saber
@@ -103,7 +104,6 @@ class TrickManager {
 		float _finalSpinSpeed;
 		SaberTrickModel* _saberTrickModel = nullptr;
 		float _timeSinceStart = 0.0f;
-		Il2CppObject* _originalSaberModelT = nullptr;
 		Il2CppString* _saberName = nullptr;
 		Il2CppString* _basicSaberName = nullptr;  // only exists up until Start2
 		Il2CppObject* _saberT = nullptr;  // needed for effecient Start2 checking in Update
