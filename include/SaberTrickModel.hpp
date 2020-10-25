@@ -36,48 +36,68 @@ class SaberTrickModel {
             Transform_SetParent = CRASH_UNLESS(il2cpp_utils::FindMethodUnsafe("UnityEngine", "Transform", "set_parent", 1));
         }
 
-        SaberGO = RealModel = SaberModel;
-        SpinT = RealT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(RealModel, "transform"));
         static auto* tSaber = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "Saber"));
-        RealSaber = CRASH_UNLESS(il2cpp_utils::RunMethod(RealModel, "GetComponent", tSaber));
-        AttachedP = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(RealSaber, "transform"));
+        RealSaber = CRASH_UNLESS(il2cpp_utils::RunMethod(SaberModel, "GetComponentInParent", tSaber));
+        
+        if (!AttachForSpin && !SpinIsRelativeToVRController) {
+            SpinT = RealT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(RealSaber, "transform"));
+        } else {
+            SpinT = RealT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(SaberModel, "transform"));
+        }
 
         if (PluginConfig::Instance().EnableTrickCutting) {
+            SaberGO = RealModel = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(RealSaber, "gameObject"));
             SetupRigidbody(RealModel);
         } else {
-            TrickModel = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "Instantiate", RealModel));
+            // The one to hide during TrickModel appearances
+            RealModel = SaberModel;
+
+            if (TrailFollowsSaberComponent) {
+                SaberGO = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(RealSaber, "gameObject"));
+            } else {
+                SaberGO = SaberModel;
+            }
+
+            TrickModel = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "Object", "Instantiate", SaberGO));
             CRASH_UNLESS(TrickModel);
 
             TrickT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(TrickModel, "transform"));
             if (AttachForSpin) SpinT = TrickT;
 
-            TrickSaber = CRASH_UNLESS(il2cpp_utils::RunMethod(TrickModel, "GetComponent", tSaber));
-            CRASH_UNLESS(TrickSaber != RealSaber);
-            logger().debug("Inserting TrickSaber %p to fakeSabers.", TrickSaber);
-            fakeSabers.insert(TrickSaber);
+            if (TrailFollowsSaberComponent) {
+                TrickSaber = CRASH_UNLESS(il2cpp_utils::RunMethod(TrickModel, "GetComponent", tSaber));
+                CRASH_UNLESS(TrickSaber);
+                CRASH_UNLESS(TrickSaber != RealSaber);
+                logger().debug("Inserting TrickSaber %p to fakeSabers.", TrickSaber);
+                fakeSabers.insert(TrickSaber);
 
-            static auto* tBehaviour = CRASH_UNLESS(il2cpp_utils::GetSystemType("UnityEngine", "Behaviour"));
-            auto* comps = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(TrickModel, "GetComponents", tBehaviour));
-            static auto* destroy = CRASH_UNLESS(il2cpp_utils::FindMethodUnsafe("UnityEngine", "Object", "DestroyImmediate", 1));
-            for (il2cpp_array_size_t i = 0; i < comps->Length(); i++) {
-                auto* klass = CRASH_UNLESS(il2cpp_functions::object_get_class(comps->values[i]));
-                auto name = il2cpp_utils::ClassStandardName(klass);
-                if (ForbiddenComponents.contains(name)) {
-                    logger().debug("Destroying component of class %s!", name.c_str());
-                    CRASH_UNLESS(il2cpp_utils::RunMethod(nullptr, destroy, comps->values[i]));
-                } else if (name == "::Saber") {
-                    TrickSaber = comps->values[i];
+                static auto* tBehaviour = CRASH_UNLESS(il2cpp_utils::GetSystemType("UnityEngine", "Behaviour"));
+                auto* comps = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(TrickModel, "GetComponents", tBehaviour));
+                static auto* destroy = CRASH_UNLESS(il2cpp_utils::FindMethodUnsafe("UnityEngine", "Object", "DestroyImmediate", 1));
+                for (il2cpp_array_size_t i = 0; i < comps->Length(); i++) {
+                    auto* klass = CRASH_UNLESS(il2cpp_functions::object_get_class(comps->values[i]));
+                    auto name = il2cpp_utils::ClassStandardName(klass);
+                    if (ForbiddenComponents.contains(name)) {
+                        logger().debug("Destroying component of class %s!", name.c_str());
+                        CRASH_UNLESS(il2cpp_utils::RunMethod(nullptr, destroy, comps->values[i]));
+                    }
                 }
             }
 
             FixSaber(TrickModel);
             SetupRigidbody(TrickModel);
 
+            if (AttachForSpin) {
+                static auto* tVRController = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "VRController"));
+                auto* vrController = CRASH_UNLESS(il2cpp_utils::RunMethod(SaberModel, "GetComponentInParent", tVRController));
+                AttachedP = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(vrController, "transform"));
+            }
+
             auto* str = CRASH_UNLESS(il2cpp_utils::createcsstr("VRGameCore"));
             auto* vrGameCore = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "GameObject", "Find", str));
             UnattachedP = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(vrGameCore, "transform"));
-            auto* trickModelT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(TrickModel, "transform"));
-            CRASH_UNLESS((il2cpp_utils::RunMethod<Il2CppObject*, false>(trickModelT, Transform_SetParent, UnattachedP)));
+
+            CRASH_UNLESS((il2cpp_utils::RunMethod<Il2CppObject*, false>(TrickT, Transform_SetParent, UnattachedP)));
             CRASH_UNLESS(il2cpp_utils::RunMethod(TrickModel, "SetActive", false));
         }
         
@@ -166,14 +186,14 @@ class SaberTrickModel {
             EndSpin();
         }
         if (SaberGO == TrickModel) return;
-        CRASH_UNLESS(il2cpp_utils::RunMethod(TrickModel, "SetActive", true));
         auto pos = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Vector3>(RealT, "position"));
         auto rot = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Quaternion>(RealT, "rotation"));
+        CRASH_UNLESS(il2cpp_utils::RunMethod(RealModel, "SetActive", false));
+        CRASH_UNLESS(il2cpp_utils::RunMethod(TrickModel, "SetActive", true));
         CRASH_UNLESS(il2cpp_utils::SetPropertyValue(TrickT, "position", pos));
         CRASH_UNLESS(il2cpp_utils::SetPropertyValue(TrickT, "rotation", rot));
-        CRASH_UNLESS(il2cpp_utils::RunMethod(RealModel, "SetActive", false));
         SaberGO = TrickModel;
-        _UpdateComponentsWithSaber(TrickSaber);
+        if (TrailFollowsSaberComponent) _UpdateComponentsWithSaber(TrickSaber);
     }
 
     void EndThrow() {
@@ -182,7 +202,7 @@ class SaberTrickModel {
         CRASH_UNLESS(il2cpp_utils::RunMethod(RealModel, "SetActive", true));
         CRASH_UNLESS(il2cpp_utils::RunMethod(TrickModel, "SetActive", false));
         SaberGO = RealModel;
-        _UpdateComponentsWithSaber(RealSaber);
+        if (TrailFollowsSaberComponent) _UpdateComponentsWithSaber(RealSaber);
     }
 
     void PrepareForSpin() {
@@ -211,8 +231,9 @@ class SaberTrickModel {
 
     void Update() {
         if (PluginConfig::Instance().EnableTrickCutting) return;
-        if (SaberGO != TrickModel) return;
+        if (SaberGO != TrickModel && !attachedForSpin) return;
         // TODO: bypass the hook entirely?
+        logger().info("TrickModel manual update.");
         static auto* update = CRASH_UNLESS(il2cpp_utils::FindMethod("", "Saber", "ManualUpdate"));
         CRASH_UNLESS((il2cpp_utils::RunMethod<Il2CppObject*, false>(TrickSaber, update)));
     }

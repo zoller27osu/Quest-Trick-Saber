@@ -91,14 +91,13 @@ MAKE_HOOK_OFFSETLESS(Saber_ManualUpdate, void, Il2CppObject* self) {
     Saber_ManualUpdate(self);
 }
 
-// TODO: remove
 void DisableBurnMarks(int saberType) {
-    /*
+    if (AttachForSpin) return;
     if (!FakeSaber) {
         static auto* tSaber = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "Saber"));
         auto* core = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "GameObject", "Find", il2cpp_utils::createcsstr("GameCore")));
         FakeSaber = CRASH_UNLESS(il2cpp_utils::RunMethod(core, "AddComponent", tSaber));
-        fakeSabers.push_back(FakeSaber);
+        fakeSabers.insert(FakeSaber);
         CRASH_UNLESS(il2cpp_utils::SetPropertyValue(FakeSaber, "enabled", false));
         logger().info("FakeSaber.isActiveAndEnabled: %i",
             CRASH_UNLESS(il2cpp_utils::GetPropertyValue<bool>(FakeSaber, "isActiveAndEnabled")));
@@ -116,11 +115,10 @@ void DisableBurnMarks(int saberType) {
         }
     }
     logger().debug("Leaving DisableBurnMarks");
-    */
 }
 
 void EnableBurnMarks(int saberType) {
-    /*
+    if (AttachForSpin) return;
     for (auto* type : tBurnTypes) {
         auto* components = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(
             "UnityEngine", "Object", "FindObjectsOfType", type));
@@ -131,7 +129,6 @@ void EnableBurnMarks(int saberType) {
                 saberType ? "_rightSaber" : "_leftSaber"));
         }
     }
-    */
 }
 
 MAKE_HOOK_OFFSETLESS(OVRInput_Update, void, Il2CppObject* self) {
