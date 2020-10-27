@@ -10,9 +10,29 @@ const Logger& logger() {
 
 extern "C" void setup(ModInfo& info) {
     info.id      = "TrickSaber";
-    info.version = "0.2.2";
+    info.version = "0.2.3";
     modInfo      = info;
     logger().info("Leaving setup!");
+}
+
+void ListGameObjects(Il2CppObject* root, std::string_view prefix) {
+    auto* go = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(root, "gameObject"));
+    auto* rootT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(root, "transform"));
+
+    auto tag = to_utf8(csstrtostr(CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(rootT, "tag"))));
+    auto name = to_utf8(csstrtostr(CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(root, "name"))));
+    bool activeSelf = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<bool>(go, "activeSelf"));
+    bool activeInHierarchy = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<bool>(go, "activeInHierarchy"));
+    logger().debug("%s%s%sname %s, tag %s", activeSelf ? "!" : " ", activeInHierarchy ? "*" : " ",
+        prefix.data(), name.c_str(), tag.c_str());
+
+    auto childCount = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(rootT, "childCount"));
+    std::string childPrefix(prefix);
+    childPrefix += "  ";
+    for (int i = 0; i < childCount; i++) {
+        auto* child = CRASH_UNLESS(il2cpp_utils::RunMethod(rootT, "GetChild", i));
+        ListGameObjects(child, childPrefix);
+    }
 }
 
 Il2CppObject* FakeSaber = nullptr;
@@ -82,17 +102,17 @@ MAKE_HOOK_OFFSETLESS(Saber_Start, void, Il2CppObject* self) {
 }
 
 MAKE_HOOK_OFFSETLESS(Saber_ManualUpdate, void, Il2CppObject* self) {
+    Saber_ManualUpdate(self);
     if (self == leftSaber.Saber) {
         leftSaber.Update();
     } else if (self == rightSaber.Saber) {
         // rightSaber.LogEverything();
         rightSaber.Update();
     }
-    Saber_ManualUpdate(self);
 }
 
 void DisableBurnMarks(int saberType) {
-    if (AttachForSpin) return;
+    if (TrailFollowsSaberComponent) return;
     if (!FakeSaber) {
         static auto* tSaber = CRASH_UNLESS(il2cpp_utils::GetSystemType("", "Saber"));
         auto* core = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "GameObject", "Find", il2cpp_utils::createcsstr("GameCore")));
@@ -114,11 +134,10 @@ void DisableBurnMarks(int saberType) {
             sabers->values[saberType] = FakeSaber;
         }
     }
-    logger().debug("Leaving DisableBurnMarks");
 }
 
 void EnableBurnMarks(int saberType) {
-    if (AttachForSpin) return;
+    if (TrailFollowsSaberComponent) return;
     for (auto* type : tBurnTypes) {
         auto* components = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>(
             "UnityEngine", "Object", "FindObjectsOfType", type));

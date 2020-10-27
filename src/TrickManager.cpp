@@ -427,6 +427,7 @@ void TrickManager::Update() {
     }
     if (_gamePaused) return;
     // RET_V_UNLESS(il2cpp_utils::GetPropertyValue<bool>(VRController, "enabled").value_or(false));
+    if (TrailFollowsSaberComponent) _saberTrickModel->Update();
 
     std::optional<Quaternion> oRot;
     if (_spinState == Ending) {  // not needed for Started because only Rotate and _currentRotation are used
@@ -505,7 +506,6 @@ void TrickManager::Update() {
     }
     // TODO: no tricks while paused? https://github.com/ToniMacaroni/TrickSaber/blob/ea60dce35db100743e7ba72a1ffbd24d1472f1aa/TrickSaber/SaberTrickManager.cs#L66
     CheckButtons();
-    if (TrailFollowsSaberComponent) _saberTrickModel->Update();
     // logger().debug("Leaving TrickSaber::Update");
 }
 
@@ -578,32 +578,6 @@ void TrickManager::TrickEnd() {
     }
 }
 
-void ListActiveChildren(Il2CppObject* root, std::string_view name) {
-    auto* rootT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(root, "transform"));
-    std::queue<Il2CppObject*> frontier;
-    frontier.push(rootT);
-    while (!frontier.empty()) {
-        auto* transform = frontier.front();
-        auto* go = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(transform, "gameObject"));
-        auto* goName = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(go, "name"));
-        std::string parentName = to_utf8(csstrtostr(goName));
-        frontier.pop();
-        int children = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(transform, "childCount"));
-        for (int i = 0; i < children; i++) {
-            auto* childT = CRASH_UNLESS(il2cpp_utils::RunMethod(transform, "GetChild", i));
-            if (childT) {
-                auto* child = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(childT, "gameObject"));
-                if (CRASH_UNLESS(il2cpp_utils::GetPropertyValue<bool>(child, "activeInHierarchy"))) {
-                    goName = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(child, "name"));
-                    std::string childName = to_utf8(csstrtostr(goName));
-                    logger().debug("found %s child '%s'", name.data(), (parentName + "/" + childName).c_str());
-                }
-                frontier.push(childT);
-            }
-        }
-    }
-}
-
 void TrickManager::EndTricks() {
     ThrowReturn();
     InPlaceRotationReturn();
@@ -659,8 +633,9 @@ void TrickManager::ThrowStart() {
 
         _saberTrickModel->PrepareForThrow();
         if (!PluginConfig::Instance().EnableTrickCutting) {
-            // ListActiveChildren(Saber, "Saber");
-            // ListActiveChildren(_saberTrickModel->SaberGO, "custom saber");
+            ListGameObjects(Saber);
+            logger().info("Now the saberTrickModel->SaberGO!");
+            ListGameObjects(_saberTrickModel->SaberGO);
         } else {
             CRASH_UNLESS(il2cpp_utils::RunMethod(_collider, "set_enabled", false));
         }

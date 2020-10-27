@@ -25,4 +25,6 @@ inline std::unordered_set<Il2CppReflectionType*> tBurnTypes;
 void DisableBurnMarks(int saberType);
 void EnableBurnMarks(int saberType);
 
+void ListGameObjects(Il2CppObject* root, std::string_view prefix = "");
+
 extern "C" void load();

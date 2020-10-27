@@ -13,21 +13,6 @@ class SaberTrickModel {
     Il2CppObject* SaberGO;  // GameObject
     Il2CppObject* SpinT;   // Transform
 
-    void ListGameObjects(Il2CppObject* root, std::string_view prefix = "") {
-        auto* rootT = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(root, "transform"));
-        auto* tag = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(rootT, "tag"));
-        auto* name = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(root, "name"));
-        logger().debug("%sname %s, tag %s", prefix.data(), to_utf8(csstrtostr(name)).c_str(), to_utf8(csstrtostr(tag)).c_str());
-
-        auto childCount = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(rootT, "childCount"));
-        std::string childPrefix(prefix);
-        childPrefix += "  ";
-        for (int i = 0; i < childCount; i++) {
-            auto* child = CRASH_UNLESS(il2cpp_utils::RunMethod(rootT, "GetChild", i));
-            ListGameObjects(CRASH_UNLESS(il2cpp_utils::GetPropertyValue(child, "gameObject")), childPrefix);
-        }
-    }
-
     SaberTrickModel(Il2CppObject* SaberModel, int st) : saberType(st) {
         CRASH_UNLESS(SaberModel);
         logger().debug("SaberTrickModel construction!");
@@ -97,6 +82,8 @@ class SaberTrickModel {
             auto* vrGameCore = CRASH_UNLESS(il2cpp_utils::RunMethod("UnityEngine", "GameObject", "Find", str));
             UnattachedP = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(vrGameCore, "transform"));
 
+            ListGameObjects(TrickModel);
+
             CRASH_UNLESS((il2cpp_utils::RunMethod<Il2CppObject*, false>(TrickT, Transform_SetParent, UnattachedP)));
             CRASH_UNLESS(il2cpp_utils::RunMethod(TrickModel, "SetActive", false));
         }
@@ -107,7 +94,7 @@ class SaberTrickModel {
     void SetupRigidbody(Il2CppObject* model) {
         static auto* tRigidbody = CRASH_UNLESS(il2cpp_utils::GetSystemType("UnityEngine", "Rigidbody"));
         // il2cpp_utils::LogClass(il2cpp_functions::class_from_system_type(tRigidbody), false);
-        Rigidbody = CRASH_UNLESS(il2cpp_utils::RunMethod(model, "GetComponent", tRigidbody));
+        Rigidbody = CRASH_UNLESS(il2cpp_utils::RunMethod(model, "GetComponentInChildren", tRigidbody));
         if (!Rigidbody) {
             Rigidbody = CRASH_UNLESS(il2cpp_utils::RunMethod(model, "AddComponent", tRigidbody));
         }
@@ -217,6 +204,7 @@ class SaberTrickModel {
         attachedForSpin = true;
         CRASH_UNLESS(il2cpp_utils::SetPropertyValue(TrickT, "position", pos));
         CRASH_UNLESS(il2cpp_utils::SetPropertyValue(TrickT, "rotation", rot));
+        if (TrailFollowsSaberComponent) _UpdateComponentsWithSaber(TrickSaber);
     }
 
     void EndSpin() {
@@ -227,6 +215,7 @@ class SaberTrickModel {
         attachedForSpin = false;
         CRASH_UNLESS(il2cpp_utils::RunMethod(TrickModel, "SetActive", false));
         CRASH_UNLESS(il2cpp_utils::RunMethod(RealModel, "SetActive", true));
+        if (TrailFollowsSaberComponent) _UpdateComponentsWithSaber(TrickSaber);
     }
 
     void Update() {
